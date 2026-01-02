@@ -1,0 +1,2801 @@
+<?php
+/**
+ * Plugin Name: Assignment Generator
+ * Description: A plugin to generate educational assignments based on grade levels and topics using OpenAI.
+ * Version: 1.2
+ * Author: AI Officer
+ */
+
+// Add Google API Client autoload from YouTube Quiz Generator
+if (file_exists(plugin_dir_path(__FILE__) . '../youtube-video-quiz-generator/vendor/autoload.php')) {
+    require_once plugin_dir_path(__FILE__) . '../youtube-video-quiz-generator/vendor/autoload.php';
+} elseif (file_exists(plugin_dir_path(__FILE__) . 'vendor/autoload.php')) {
+    require_once plugin_dir_path(__FILE__) . 'vendor/autoload.php';
+}
+
+use Google\Client;
+use Google\Service\Drive;
+use Google\Service\Forms;
+
+// Register the shortcode
+function assignment_generator_shortcode() {
+    ob_start();
+    ?>
+    <style>
+        /* Add these CSS loading animations to your existing <style> section */
+
+/* Spinner Loading Animation */
+.loading-spinner {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid #f3f3f3;
+    border-top: 2px solid #0073aa;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-right: 8px;
+    vertical-align: middle;
+}
+
+.loading-spinner-large {
+    width: 24px;
+    height: 24px;
+    border-width: 3px;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Pulse Loading Animation */
+.loading-pulse {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    background-color: #0073aa;
+    border-radius: 50%;
+    margin-right: 8px;
+    animation: pulse-scale 1.5s ease-in-out infinite;
+    vertical-align: middle;
+}
+
+@keyframes pulse-scale {
+    0% {
+        transform: scale(0.8);
+        opacity: 1;
+    }
+    50% {
+        transform: scale(1.2);
+        opacity: 0.7;
+    }
+    100% {
+        transform: scale(0.8);
+        opacity: 1;
+    }
+}
+
+/* Dots Loading Animation */
+.loading-dots {
+    display: inline-block;
+    margin-right: 8px;
+    vertical-align: middle;
+}
+
+.loading-dots::after {
+    content: '';
+    display: inline-block;
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background-color: #0073aa;
+    animation: dots 1.4s ease-in-out infinite both;
+    margin-right: 2px;
+}
+
+.loading-dots::before {
+    content: '';
+    display: inline-block;
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background-color: #0073aa;
+    animation: dots 1.4s ease-in-out infinite both;
+    animation-delay: -0.16s;
+    margin-right: 2px;
+}
+
+@keyframes dots {
+    0%, 80%, 100% {
+        transform: scale(0.8);
+        opacity: 0.5;
+    }
+    40% {
+        transform: scale(1.2);
+        opacity: 1;
+    }
+}
+
+/* Processing Status Styles */
+.status-processing {
+    color: #0073aa;
+    font-weight: 500;
+}
+
+.status-success {
+    color: #28a745;
+    font-weight: 500;
+}
+
+.status-error {
+    color: #dc3545;
+    font-weight: 500;
+}
+
+.status-warning {
+    color: #ffc107;
+    font-weight: 500;
+}
+        #back-to-tools {
+    display: inline-flex;
+    align-items: center;
+    margin-bottom: 15px;
+    text-decoration: none;
+}
+
+.ct-container-full {
+    display: flex
+;
+    justify-content: center;
+    align-items: center;
+    min-height: 80vh !important;
+    width: 100%;
+    padding-top: 0;
+    padding-bottom: 0px;
+}
+
+        #assignment-output {
+            display: block;
+            margin-top: 20px;
+            padding: 10px;
+            background-color: white !important;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            width: 100%;
+            box-shadow: none;
+        }
+
+        #assignment-output pre {
+            background-color: white !important;
+            border: none;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+        }
+
+        #assignment-output h5, #assignment-output h3 {
+            font-size: 18px;
+            font-weight: bold;
+            margin-top: -1px;
+            margin-bottom: -5px;
+        }
+
+        #assignment-output ul {
+            margin-top: -5px;
+        }
+
+        #generate-assignment {
+            width: 100%; 
+            padding: 14px; 
+            color: #fff; 
+            border: none; 
+            border-radius: 
+            4px; font-size: 18px; 
+            cursor: pointer; 
+            transition: background-color 0.3s ease;
+            background-color: #0073aa;
+        }
+
+        #generate-assignment:hover {
+            background-color: #00567d;
+        }
+
+        #copy-assignment {
+            background-color: #4CAF50;
+        }
+
+        #copy-assignment:hover {
+            background-color: #388e3c;
+        }
+
+        #clear-assignment {
+            background-color: #f44336;
+        }
+
+        #clear-assignment:hover {
+            background-color: #d32f2f;
+        }
+
+        #export-to-google-form {
+            background-color: #4285f4;
+        }
+
+        #export-to-google-form:hover {
+            background-color: #3367d6;
+        }
+
+        .form-group {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            font-weight: bold;
+            color: #555;
+            margin-right: 10px;
+            flex-basis: 40%; /* Adjust width of label */
+            text-align: left;
+        }
+
+        .form-group input {
+            flex-basis: 40%; /* Adjust width of input */
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+        .form-row {
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .form-column {
+            width: 48%;
+            display: flex;
+            flex-direction: column;
+        }
+        #save-assignment:hover {
+    background-color:rgb(225, 156, 52);
+}
+
+        
+/* Responsive styles */
+
+@media screen and (max-width: 768px) {
+    #assignment-generator {
+        width: 100% !important;
+        margin: 10px auto !important;
+        padding: 15px !important;
+    }
+    #assignment-output {
+        padding: 10px;
+    }
+    #assignment-actions {
+        display: flex;
+        flex-direction: column;
+    }
+    #copy-output,
+    #clear-output {
+        width: 100% !important;
+        margin-bottom: 10px;
+        justify-content: center;
+    }
+}
+
+@media screen and (max-width: 480px) {
+    #assignment-generator {
+        width: 100% !important;
+        padding: 10px !important;
+        margin: 5px auto !important;
+    }
+    #assignment-activity {
+        font-size: 16px;
+        padding: 12px;
+    }
+    #assignment-topic {
+        height: 80px;
+    }
+    
+}
+.form-matrix-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-bottom: 20px;
+}
+
+.form-field {
+    display: flex;
+    flex-direction: column;
+}
+
+/* Mobile responsive - stack vertically on small screens */
+@media screen and (max-width: 768px) {
+    .form-matrix-container {
+        grid-template-columns: 1fr; /* Single column on mobile */
+        gap: 15px;
+    }
+}
+
+/* Very small screens */
+@media screen and (max-width: 480px) {
+    .form-matrix-container {
+        gap: 10px;
+    }
+    
+    .form-field label {
+        font-size: 14px;
+        margin-bottom: 8px;
+    }
+    
+    .form-field select {
+        padding: 10px;
+        font-size: 16px; /* Prevents zoom on iOS */
+    }
+}
+/* Multiple file upload styles */
+#files-preview-container {
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    padding: 15px;
+    background-color: #fafafa;
+}
+
+#files-preview-container h4 {
+    margin: 0 0 10px 0;
+    color: #333;
+    font-size: 16px;
+}
+    
+#answersheet-output { display: none; margin-top: 20px; padding: 10px; background: #f9f9f9; border: 1px solid #ddd; border-radius: 5px; }
+
+
+.file-item {
+    transition: background-color 0.2s ease;
+}
+
+.file-item:hover {
+    background-color: #e8f4f8 !important;
+}
+
+.file-item button:hover {
+    background-color: #c82333 !important;
+    transform: scale(1.05);
+}
+
+#files-analysis details summary {
+    font-weight: bold;
+    margin-bottom: 5px;
+    color: #155724;
+}
+
+#files-analysis details[open] summary {
+    margin-bottom: 10px;
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.6; }
+    100% { opacity: 1; }
+}
+
+.processing {
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+@media screen and (max-width: 768px) {
+    .file-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+    
+    .file-item > div:last-child {
+        width: 100%;
+        justify-content: space-between;
+    }
+    
+    #files-preview-container {
+        padding: 10px;
+    }
+}
+    </style>
+
+<a href="https://vidyahub.eduaihub.in/tools/" id="back-to-tools" style="display: inline-flex; align-items: center;">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M19 12H5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M12 19L5 12L12 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    Back to Tools
+</a>
+
+    <div id="assignment-generator" style="width: 1200px; margin: 40px auto; padding: 20px; border: 1px solid #ddd; border-radius: 8px; box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1); font-family: Arial, sans-serif; background-color: #fff;">
+        <h2 style="text-align: center; color: #333;">Test Generator</h2>
+        <!-- // In the assignment_generator_shortcode() function, add this new section before the existing form elements -->
+<div class="form-matrix-container">
+<div class="form-field">
+        <label for="saved-item-selection" style="font-weight: bold; margin-bottom: 10px; display: block; color: #555;">Select from Saved Activities:</label>
+        <select id="saved-items" name="saved-items" style="width: 100%; padding: 7px; border: 1px solid #ccc; border-radius: 4px;">
+            <option value="">Choose from Saved Items</option>
+        </select>
+    </div>
+        
+        <div class="form-field">
+        <label for="assignment-grade-level" style="font-weight: bold; margin-bottom: 10px; display: block; color: #555;">Grade level:</label>
+        <select id="assignment-grade-level" name="assignment-grade-level" style="width: 100%; padding: 7px; border: 1px solid #ccc; border-radius: 4px;">
+            <option value="Select Grade">Select Grade</option>
+            <option value="1th">1st grade</option>
+            <option value="2nd">2nd grade</option>
+            <option value="3rd">3rd grade</option>
+            <option value="4th">4th grade</option>    
+            <option value="5th">5th grade</option>
+            <option value="6th">6th grade</option>
+            <option value="7th">7th grade</option>
+            <option value="8th">8th grade</option>
+            <option value="9th">9th grade</option>
+            <option value="10th">10th grade</option>
+            <option value="11th">11th grade</option>
+            <option value="12th">12th grade</option>
+        </select>
+    </div>
+
+        <div class="form-field">
+        <label for="assignment-subject" style="font-weight: bold; margin-bottom: 10px; display: block; color: #555;">Subject:</label>
+        <select id="assignment-subject" name="assignment-subject" style="width: 100%; padding: 7px; border: 1px solid #ccc; border-radius: 4px;">
+            <option value="Select">Select</option>
+            <option value="Mathematics">Mathematics</option>
+            <option value="Science">Science</option>
+            <option value="Social Studies">Social Studies</option>
+            <option value="Marathi">Marathi</option>
+            <option value="Hindi">Hindi</option>
+            <option value="Art">Art</option>
+            <option value="Physical Education">Physical Education</option>
+            <option value="Computer Science">Computer Science</option>
+            <option value="Other">Other</option>
+        </select>
+    </div>
+         <!-- Language Selection - NEW -->
+         <div class="form-field">
+        <label for="assignment-language" style="font-weight: bold; margin-bottom: 10px; display: block; color: #555;">Output Language:</label>
+        <select id="assignment-language" name="assignment-language" style="width: 100%; padding: 7px; border: 1px solid #ccc; border-radius: 4px;">
+            <option value="Select">Select</option>
+            <option value="English">English</option>           
+            <option value="Hindi">Hindi</option>
+            <option value="Marathi">Marathi</option>
+        </select>
+    </div>
+</div>
+<!-- Enhanced file upload section with multiple file support -->
+<div class="file-upload-container" style="margin-bottom: 20px; width: 100%; position: relative;">
+    <label for="reference-files" style="font-weight: bold; margin-bottom: 10px; display: block; color: #555;">Upload Reference Files (OCR Supported):</label>
+    <div style="position: relative; width: 100%; height: auto; min-height: 60px; border: 2px dashed #0073aa; border-radius: 8px; background-color: #f9f9f9; padding: 10px; margin-bottom: 5px;">
+        <input type="file" id="reference-files" name="reference-files[]" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" multiple style="width: 100%; opacity: 1; cursor: pointer; padding: 8px; position: relative; z-index: 2;">
+    </div>
+    <p style="font-size: 12px; color: #666; margin-top: 5px; line-height: 1.4;">
+        Upload multiple documents to extract text and create relevant test questions. 
+        <strong>OCR Supported:</strong> PDF, JPG, JPEG, PNG files will have text automatically extracted.
+        <strong>Also Supported:</strong> Word documents (.doc, .docx)
+        <br><strong>Tip:</strong> You can select multiple files at once or add them one by one.
+    </p>
+    <div id="files-preview-container" style="display: none; margin-top: 15px;"></div>
+    <div id="files-analysis" style="display: none; margin-top: 10px;"></div>
+</div>
+
+        <label for="assignment-topic" style="font-weight: bold; margin-bottom: 10px; display: block; color: #555;">Topic, Standard, or Objective:</label>
+        <textarea id="assignment-topic" name="assignment-topic" placeholder="Enter topic, standard, or objective" style="width: 100%; padding: 10px; margin-bottom: 20px; border: 1px solid #ccc; border-radius: 4px; height: 100px;"></textarea>
+        
+      <label style="font-weight: bold; display:block; margin-bottom: 10px;">Select Question Types:</label>
+
+<div id="question-type-section" style="display: flex; flex-wrap: wrap; gap: 20px; margin-bottom: 20px;">
+    <!-- Multiple Choice -->
+    <div class="question-type-group" style="flex: 1; min-width: 200px;">
+        <label><input type="checkbox" name="question-type" value="mcq"> Multiple Choice</label>
+        <input type="number" id="mcq-count" name="mcq-count" value="1" min="1" max="10"
+               style="width: 100%; padding: 6px; margin-top: 4px; display: none; border: 1px solid #ccc; border-radius: 4px;">
+    </div>
+
+    <!-- True / False -->
+    <div class="question-type-group" style="flex: 1; min-width: 200px;">
+        <label><input type="checkbox" name="question-type" value="true_false"> True / False</label>
+        <input type="number" id="true-false-count" name="true-false-count" value="1" min="1" max="10"
+               style="width: 100%; padding: 6px; margin-top: 4px; display: none; border: 1px solid #ccc; border-radius: 4px;">
+    </div>
+
+    <!-- Fill in the Blanks -->
+    <div class="question-type-group" style="flex: 1; min-width: 200px;">
+        <label><input type="checkbox" name="question-type" value="fill_blanks"> Fill in the Blanks</label>
+        <input type="number" id="fill-blanks-count" name="fill-blanks-count" value="1" min="1" max="10"
+               style="width: 100%; padding: 6px; margin-top: 4px; display: none; border: 1px solid #ccc; border-radius: 4px;">
+    </div>
+
+    <!-- Short Answer -->
+    <div class="question-type-group" style="flex: 1; min-width: 200px;">
+        <label><input type="checkbox" name="question-type" value="short_answer"> Short Answer</label>
+        <input type="number" id="short-answer-count" name="short-answer-count" value="1" min="1" max="10"
+               style="width: 100%; padding: 6px; margin-top: 4px; display: none; border: 1px solid #ccc; border-radius: 4px;">
+    </div>
+</div>
+
+
+        <button id="generate-assignment">Generate</button>
+
+        <div id="assignment-output"></div>
+
+        <!-- Updated assignment actions section with answer sheet button -->
+<div id="assignment-actions" 
+    style="
+        margin-top: 10px; 
+        display: flex;
+        justify-content: flex-end; 
+        gap: 10px;
+        align-items: center;
+        width: 100%;">
+    <button id="copy-assignment" 
+        style="
+            padding: 10px; 
+            color: white;     
+            border: none;
+            border-radius: 4px; 
+            cursor: pointer; 
+            display: flex;
+            align-items: center;
+            width: 100px;
+            justify-content: center;
+            background-color: #4CAF50;">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 18px; height: 18px; margin-right: 5px;">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+        </svg>
+        Copy
+    </button>
+
+    <button 
+        id="clear-assignment" 
+        style="
+            padding: 10px; 
+            color: white; 
+            border: none;
+            border-radius: 4px; 
+            cursor: pointer; 
+            display: flex;
+            align-items: center;
+            width: 100px;
+            justify-content: center;
+            background-color: #f44336;">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 18px; height: 18px; margin-right: 5px; margin-bottom:5px">
+            <polyline points="3 6 5 6 21 6"></polyline>
+            <path d="M19 6L17.5 20a2 2 0 0 1-2 2H8.5a2 2 0 0 1-2-2L5 6m5 10v4m4-4v4"></path>
+            <line x1="10" y1="11" x2="10" y2="17"></line>
+        </svg>
+        Clear
+    </button>
+    
+    <button 
+        id="save-assignment" 
+        style="
+            padding: 10px; 
+            color: white; 
+            border: none;
+            border-radius: 4px; 
+            cursor: pointer; 
+            display: none;
+            align-items: center;
+            background-color: #ff9800;
+            width: 150px;
+            justify-content: center;">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 18px; height: 18px; margin-right: 5px;">
+            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+            <polyline points="17 21 17 13 7 13 7 21"></polyline>
+            <polyline points="7 3 7 8 15 8"></polyline>
+        </svg>
+        Save Test
+    </button>
+
+    <!-- NEW: View Answer Sheet Button -->
+    <button 
+        id="view-answersheet" 
+        style="
+            padding: 10px; 
+            color: white; 
+            border: none;
+            border-radius: 4px; 
+            cursor: pointer; 
+            display: none;
+            align-items: center;
+            background-color: #17a2b8;
+            width: 180px;
+            justify-content: center;">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 18px; height: 18px; margin-right: 5px;">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="16" y1="13" x2="8" y2="13"></line>
+            <line x1="16" y1="17" x2="8" y2="17"></line>
+            <polyline points="10 9 9 9 8 9"></polyline>
+        </svg>
+        View Model Answer Sheet
+    </button>
+
+    <button 
+        id="export-to-google-form" 
+        style="
+            padding: 10px; 
+            color: white; 
+            border: none;
+            border-radius: 4px; 
+            cursor: pointer; 
+            display: none;
+            align-items: center;
+            background-color: #4285f4;
+            width: 200px;
+            justify-content: center;">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 18px; height: 18px; margin-right: 5px;">
+            <path d="M19 14v6H5v-6"></path>
+            <path d="M12 3v12"></path>
+            <polyline points="7 8 12 3 17 8"></polyline>
+        </svg>
+        Export to Google Form
+    </button>
+</div>  
+
+<!-- NEW: Answer Sheet Output Container -->
+<div id="answersheet-output" style="display: none; margin-top: 20px;"></div>
+
+
+    <?php
+    return ob_get_clean();
+}
+add_shortcode('assignment_generator', 'assignment_generator_shortcode');
+
+function assignment_generator_scripts() {
+    // Enqueue Font Awesome for icons
+    wp_enqueue_style('font-awesome', 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css');
+
+    // Localize the script with the AJAX URL and nonce
+    wp_register_script('assignment-generator-js', false);
+    wp_localize_script('assignment-generator-js', 'assignmentGenerator', array(
+        'ajaxurl' => admin_url('admin-ajax.php'),
+        'nonce' => wp_create_nonce('assignment_generator_nonce')
+    ));
+    wp_enqueue_script('assignment-generator-js'); 
+    
+}
+add_action('wp_enqueue_scripts', 'assignment_generator_scripts');
+
+// Handle AJAX request to generate assignment
+add_action('wp_ajax_generate_assignment', 'handle_generate_assignment');
+add_action('wp_ajax_nopriv_generate_assignment', 'handle_generate_assignment');
+
+// Handle AJAX Request to Save Assignment
+add_action('wp_ajax_save_assignment', 'save_assignment_to_library');
+add_action('wp_ajax_nopriv_save_assignment', 'save_assignment_to_library');
+
+// ADD THIS: Register AJAX handler for getting saved activities
+add_action('wp_ajax_get_saved_activities', 'get_saved_activities_callback');
+add_action('wp_ajax_nopriv_get_saved_activities', 'get_saved_activities_callback');
+
+// Handle AJAX request for Mistral OCR processing
+add_action('wp_ajax_process_file_with_mistral', 'handle_process_file_with_mistral');
+add_action('wp_ajax_nopriv_process_file_with_mistral', 'handle_process_file_with_mistral');
+
+// NEW: Handle AJAX request for Google Form export
+add_action('wp_ajax_export_assignment_to_google_form', 'handle_export_assignment_to_google_form');
+add_action('wp_ajax_nopriv_export_assignment_to_google_form', 'handle_export_assignment_to_google_form');
+// NEW: Register AJAX handler for PDF generation
+add_action('wp_ajax_generate_answer_sheet_pdf', 'handle_answer_sheet_pdf_generation');
+add_action('wp_ajax_nopriv_generate_answer_sheet_pdf', 'handle_answer_sheet_pdf_generation');
+
+function handle_answer_sheet_pdf_generation() {
+    try {
+        error_log('🔄 Starting PDF generation for answer sheet...');
+        
+        // Verify nonce
+        if (!check_ajax_referer('assignment_generator_nonce', 'security', false)) {
+            throw new Exception('Security check failed.');
+        }
+
+        // Get the HTML content and title
+        $html_content = isset($_POST['answer_sheet_html']) ? wp_kses_post($_POST['answer_sheet_html']) : '';
+        $assignment_title = isset($_POST['assignment_title']) ? sanitize_text_field($_POST['assignment_title']) : 'Answer Sheet';
+
+        if (empty($html_content)) {
+            throw new Exception('No content provided for PDF generation.');
+        }
+
+        error_log('📄 Generating PDF for: ' . $assignment_title);
+
+        // Try multiple PDF generation methods
+        $pdf_url = null;
+        
+        // Method 1: Try with TCPDF if available
+        if (class_exists('TCPDF')) {
+            $pdf_url = generate_pdf_with_tcpdf($html_content, $assignment_title);
+        }
+        
+        // Method 2: Try with mPDF if available
+        if (!$pdf_url && class_exists('Mpdf\Mpdf')) {
+            $pdf_url = generate_pdf_with_mpdf($html_content, $assignment_title);
+        }
+        
+        // Method 3: Try with DomPDF if available
+        if (!$pdf_url && class_exists('Dompdf\Dompdf')) {
+            $pdf_url = generate_pdf_with_dompdf($html_content, $assignment_title);
+        }
+        
+        // Method 4: Fallback to simple HTML to PDF conversion
+        if (!$pdf_url) {
+            $pdf_url = generate_pdf_simple_method($html_content, $assignment_title);
+        }
+
+        if ($pdf_url) {
+            error_log('✅ PDF generated successfully: ' . $pdf_url);
+            wp_send_json_success(array(
+                'download_url' => $pdf_url,
+                'message' => 'PDF generated successfully'
+            ));
+        } else {
+            throw new Exception('Failed to generate PDF with all available methods.');
+        }
+
+    } catch (Exception $e) {
+        error_log('❌ PDF generation error: ' . $e->getMessage());
+        wp_send_json_error(array(
+            'message' => 'PDF generation failed: ' . $e->getMessage()
+        ));
+    }
+}
+
+/**
+ * Generate PDF using TCPDF library
+ */
+function generate_pdf_with_tcpdf($html_content, $title) {
+    try {
+        error_log('🔄 Attempting PDF generation with TCPDF...');
+        
+        // Create new PDF document
+        $pdf = new TCPDF(PDF_PAGE_ORIENTATION, PDF_UNIT, PDF_PAGE_FORMAT, true, 'UTF-8', false);
+        
+        // Set document information
+        $pdf->SetCreator('EduAI Hub Assignment Generator');
+        $pdf->SetAuthor('EduAI Hub');
+        $pdf->SetTitle($title);
+        $pdf->SetSubject('Model Answer Sheet');
+        
+        // Set margins
+        $pdf->SetMargins(20, 20, 20);
+        $pdf->SetHeaderMargin(10);
+        $pdf->SetFooterMargin(10);
+        
+        // Add a page
+        $pdf->AddPage();
+        
+        // Set font
+        $pdf->SetFont('helvetica', '', 12);
+        
+        // Clean HTML for PDF
+        $clean_html = clean_html_for_pdf($html_content);
+        
+        // Write the HTML content
+        $pdf->writeHTML($clean_html, true, false, true, false, '');
+        
+        // Save PDF to uploads directory
+        $upload_dir = wp_upload_dir();
+        $pdf_dir = $upload_dir['basedir'] . '/answer-sheets/';
+        
+        if (!file_exists($pdf_dir)) {
+            wp_mkdir_p($pdf_dir);
+        }
+        
+        $filename = 'answer_sheet_' . time() . '_' . wp_generate_password(8, false) . '.pdf';
+        $file_path = $pdf_dir . $filename;
+        
+        $pdf->Output($file_path, 'F');
+        
+        // Return download URL
+        $file_url = $upload_dir['baseurl'] . '/answer-sheets/' . $filename;
+        error_log('✅ TCPDF generation successful: ' . $file_url);
+        
+        return $file_url;
+        
+    } catch (Exception $e) {
+        error_log('❌ TCPDF generation failed: ' . $e->getMessage());
+        return false;
+    }
+}
+
+/**
+ * Generate PDF using mPDF library
+ */
+function generate_pdf_with_mpdf($html_content, $title) {
+    try {
+        error_log('🔄 Attempting PDF generation with mPDF...');
+        
+        $mpdf = new \Mpdf\Mpdf([
+            'format' => 'A4',
+            'margin_left' => 20,
+            'margin_right' => 20,
+            'margin_top' => 20,
+            'margin_bottom' => 20,
+        ]);
+        
+        $mpdf->SetTitle($title);
+        $mpdf->SetAuthor('EduAI Hub');
+        
+        // Clean HTML for PDF
+        $clean_html = clean_html_for_pdf($html_content);
+        
+        $mpdf->WriteHTML($clean_html);
+        
+        // Save to uploads directory
+        $upload_dir = wp_upload_dir();
+        $pdf_dir = $upload_dir['basedir'] . '/answer-sheets/';
+        
+        if (!file_exists($pdf_dir)) {
+            wp_mkdir_p($pdf_dir);
+        }
+        
+        $filename = 'answer_sheet_' . time() . '_' . wp_generate_password(8, false) . '.pdf';
+        $file_path = $pdf_dir . $filename;
+        
+        $mpdf->Output($file_path, 'F');
+        
+        $file_url = $upload_dir['baseurl'] . '/answer-sheets/' . $filename;
+        error_log('✅ mPDF generation successful: ' . $file_url);
+        
+        return $file_url;
+        
+    } catch (Exception $e) {
+        error_log('❌ mPDF generation failed: ' . $e->getMessage());
+        return false;
+    }
+}
+
+/**
+ * Generate PDF using DomPDF library
+ */
+function generate_pdf_with_dompdf($html_content, $title) {
+    try {
+        error_log('🔄 Attempting PDF generation with DomPDF...');
+        
+        $dompdf = new \Dompdf\Dompdf();
+        
+        // Set options
+        $options = $dompdf->getOptions();
+        $options->set(array('isRemoteEnabled' => true));
+        $dompdf->setOptions($options);
+        
+        // Clean HTML for PDF
+        $clean_html = clean_html_for_pdf($html_content);
+        
+        // Add CSS for better formatting
+        $html_with_css = '
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <title>' . esc_html($title) . '</title>
+            <style>
+                body { font-family: Arial, sans-serif; margin: 20px; }
+                h1, h2, h3 { color: #0073aa; }
+                .question-container { margin-bottom: 20px; padding: 15px; border-left: 4px solid #28a745; }
+                .answer-section { background: #f8f9fa; padding: 10px; margin-top: 10px; }
+                .correct-answer { color: #28a745; font-weight: bold; }
+            </style>
+        </head>
+        <body>
+            ' . $clean_html . '
+        </body>
+        </html>';
+        
+        $dompdf->loadHtml($html_with_css);
+        $dompdf->setPaper('A4', 'portrait');
+        $dompdf->render();
+        
+        // Save to uploads directory
+        $upload_dir = wp_upload_dir();
+        $pdf_dir = $upload_dir['basedir'] . '/answer-sheets/';
+        
+        if (!file_exists($pdf_dir)) {
+            wp_mkdir_p($pdf_dir);
+        }
+        
+        $filename = 'answer_sheet_' . time() . '_' . wp_generate_password(8, false) . '.pdf';
+        $file_path = $pdf_dir . $filename;
+        
+        file_put_contents($file_path, $dompdf->output());
+        
+        $file_url = $upload_dir['baseurl'] . '/answer-sheets/' . $filename;
+        error_log('✅ DomPDF generation successful: ' . $file_url);
+        
+        return $file_url;
+        
+    } catch (Exception $e) {
+        error_log('❌ DomPDF generation failed: ' . $e->getMessage());
+        return false;
+    }
+}
+
+/**
+ * Simple PDF generation method using basic HTML conversion
+ */
+function generate_pdf_simple_method($html_content, $title) {
+    try {
+        error_log('🔄 Using simple method for PDF generation...');
+        
+        // Clean and simplify HTML content
+        $clean_content = clean_html_for_simple_pdf($html_content);
+        
+        // Create a simple HTML page
+        $html_page = '<!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <title>' . esc_html($title) . '</title>
+            <style>
+                body { 
+                    font-family: Arial, sans-serif; 
+                    margin: 40px; 
+                    line-height: 1.6;
+                    color: #333;
+                }
+                h1, h2, h3 { color: #0073aa; margin-top: 30px; }
+                .question { 
+                    margin-bottom: 25px; 
+                    padding: 15px; 
+                    border-left: 4px solid #28a745;
+                    background: #f8f9fa;
+                }
+                .answer { 
+                    background: white; 
+                    padding: 10px; 
+                    margin: 10px 0;
+                    border-radius: 4px;
+                }
+                .correct { color: #28a745; font-weight: bold; }
+                .explanation { color: #666; margin-top: 8px; }
+                @media print {
+                    body { margin: 20px; }
+                    .question { break-inside: avoid; }
+                }
+            </style>
+        </head>
+        <body>
+            <h1>' . esc_html($title) . '</h1>
+            <hr style="border: 1px solid #0073aa; margin: 20px 0;">
+            ' . $clean_content . '
+        </body>
+        </html>';
+        
+        // Save as HTML file first
+        $upload_dir = wp_upload_dir();
+        $pdf_dir = $upload_dir['basedir'] . '/answer-sheets/';
+        
+        if (!file_exists($pdf_dir)) {
+            wp_mkdir_p($pdf_dir);
+        }
+        
+        $filename = 'answer_sheet_' . time() . '_' . wp_generate_password(8, false) . '.html';
+        $file_path = $pdf_dir . $filename;
+        
+        file_put_contents($file_path, $html_page);
+        
+        $file_url = $upload_dir['baseurl'] . '/answer-sheets/' . $filename;
+        error_log('✅ Simple method generation successful (HTML): ' . $file_url);
+        
+        return $file_url;
+        
+    } catch (Exception $e) {
+        error_log('❌ Simple PDF generation failed: ' . $e->getMessage());
+        return false;
+    }
+}
+
+/**
+ * Clean HTML content for PDF generation
+ */
+function clean_html_for_pdf($html) {
+    // Remove script tags
+    $html = preg_replace('/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/mi', '', $html);
+    
+    // Remove style attributes that might cause issues
+    $html = preg_replace('/style="[^"]*"/i', '', $html);
+    
+    // Replace complex divs with simpler elements
+    $html = str_replace('<div class="model-answer-sheet">', '<div>', $html);
+    
+    // Clean up extra whitespace
+    $html = preg_replace('/\s+/', ' ', $html);
+    
+    // Ensure UTF-8 encoding
+    $html = mb_convert_encoding($html, 'UTF-8', 'UTF-8');
+    
+    return $html;
+}
+
+/**
+ * Clean HTML for simple PDF method
+ */
+function clean_html_for_simple_pdf($html) {
+    // Strip all tags except basic formatting
+    $allowed_tags = '<h1><h2><h3><h4><p><br><strong><b><em><i><ul><ol><li><div>';
+    $html = strip_tags($html, $allowed_tags);
+    
+    // Convert div elements to p elements for better PDF rendering
+    $html = str_replace('<div', '<p', $html);
+    $html = str_replace('</div>', '</p>', $html);
+    
+    // Remove empty paragraphs
+    $html = preg_replace('/<p[^>]*>[\s&nbsp;]*<\/p>/', '', $html);
+    
+    return $html;
+}
+
+/**
+ * Clean up old PDF files (optional - can be called via cron)
+ */
+function cleanup_old_answer_sheet_files() {
+    $upload_dir = wp_upload_dir();
+    $pdf_dir = $upload_dir['basedir'] . '/answer-sheets/';
+    
+    if (!file_exists($pdf_dir)) {
+        return;
+    }
+    
+    $files = glob($pdf_dir . '*');
+    $now = time();
+    
+    foreach ($files as $file) {
+        if (is_file($file)) {
+            // Delete files older than 24 hours
+            if ($now - filemtime($file) >= 24 * 3600) {
+                unlink($file);
+                error_log('🗑️ Cleaned up old answer sheet file: ' . basename($file));
+            }
+        }
+    }
+}
+
+// Optional: Schedule cleanup of old files
+if (!wp_next_scheduled('cleanup_answer_sheet_files')) {
+    wp_schedule_event(time(), 'daily', 'cleanup_answer_sheet_files');
+}
+add_action('cleanup_answer_sheet_files', 'cleanup_old_answer_sheet_files');
+
+
+
+// IMPROVED: Function to handle Google Form export
+function handle_export_assignment_to_google_form() {
+    try {
+        error_log('🚀 Starting Google Form export handler...');
+        
+        // Check if Google API Client is loaded
+        if (!class_exists('Google\Client')) {
+            throw new Exception('Google API Client library not found.');
+        }
+
+        // Check the nonce for security - FIXED: Use same nonce field name as JavaScript
+        if (!check_ajax_referer('assignment_generator_nonce', 'security', false)) {
+            throw new Exception('Security check failed.');
+        }
+
+        // Retrieve the data from the POST request
+        $assignment_title = isset($_POST['assignment_title']) ? sanitize_text_field($_POST['assignment_title']) : '';
+        $assignment_content = isset($_POST['assignment_content']) ? wp_kses_post($_POST['assignment_content']) : '';
+        $questions = isset($_POST['questions']) ? json_decode(stripslashes($_POST['questions']), true) : array();
+        $grade = isset($_POST['grade']) ? sanitize_text_field($_POST['grade']) : '';
+        $subject = isset($_POST['subject']) ? sanitize_text_field($_POST['subject']) : '';
+        $language = isset($_POST['language']) ? sanitize_text_field($_POST['language']) : '';
+
+        error_log('📊 Received data - Questions count: ' . count($questions));
+        error_log('📝 Assignment title: ' . $assignment_title);
+
+        // Validate the input data
+        if (empty($assignment_title) || empty($questions)) {
+            throw new Exception('Invalid data received - missing title or questions');
+        }
+
+        // Ensure that $questions is an array
+        if (!is_array($questions)) {
+            throw new Exception('Failed to decode questions data. Please try again.');
+        }
+
+        error_log('✅ Validation passed. Processing ' . count($questions) . ' questions');
+
+        // Initialize the Google Client with Service Account
+        $client = get_google_client_for_assignment();
+
+        // Create form service
+        $service = new Google\Service\Forms($client);
+        
+        // Create form with title initially - FIXED: Simplified form creation like YouTube Quiz
+        $form = new Google\Service\Forms\Form([
+            'info' => [
+                'title' => $assignment_title . ' (' . $grade . ' - ' . $subject . ')'
+            ]
+        ]);
+        $form = $service->forms->create($form);
+        
+        error_log('📝 Created Google Form with ID: ' . $form->formId);
+
+        // Add questions to the form - Process each question individually like YouTube Quiz
+        foreach ($questions as $index => $question) {
+            if (empty($question['question']) || empty($question['type'])) {
+                error_log('⚠️ Skipping invalid question at index ' . $index);
+                continue;
+            }
+
+            // Clean question text to remove newlines and extra formatting
+            $cleanedQuestion = cleanQuestionTextForGoogleForms($question['question']);
+            
+            error_log('📋 Processing question ' . ($index + 1) . ': ' . substr($cleanedQuestion, 0, 50) . '... (Type: ' . $question['type'] . ')');
+
+            $item = null;
+
+            switch ($question['type']) {
+                case 'multiple_choice':
+                    if (isset($question['options']) && is_array($question['options'])) {
+                        $options = [];
+                        foreach ($question['options'] as $optionText) {
+                            if (!empty($optionText)) {
+                                // Clean option text as well
+                                $cleanedOption = cleanQuestionTextForGoogleForms($optionText);
+                                $options[] = ['value' => $cleanedOption];
+                            }
+                        }
+                        
+                        if (count($options) > 0) {
+                            $item = new Google\Service\Forms\Item([
+                                'title' => $cleanedQuestion,
+                                'questionItem' => [
+                                    'question' => [
+                                        'required' => true,
+                                        'choiceQuestion' => [
+                                            'type' => 'RADIO',
+                                            'options' => $options,
+                                            'shuffle' => true
+                                        ]
+                                    ]
+                                ]
+                            ]);
+                            error_log('✅ Created multiple choice with ' . count($options) . ' options');
+                        }
+                    } else {
+                        // Fallback: treat as short answer if no valid options
+                        $item = new Google\Service\Forms\Item([
+                            'title' => $cleanedQuestion,
+                            'questionItem' => [
+                                'question' => [
+                                    'required' => true,
+                                    'textQuestion' => [
+                                        'paragraph' => false
+                                    ]
+                                ]
+                            ]
+                        ]);
+                        error_log('⚠️ No valid options found, converting to text question');
+                    }
+                    break;
+
+                case 'true_false':
+                    $item = new Google\Service\Forms\Item([
+                        'title' => $cleanedQuestion,
+                        'questionItem' => [
+                            'question' => [
+                                'required' => true,
+                                'choiceQuestion' => [
+                                    'type' => 'RADIO',
+                                    'options' => [
+                                        ['value' => 'True'],
+                                        ['value' => 'False']
+                                    ],
+                                    'shuffle' => false
+                                ]
+                            ]
+                        ]
+                    ]);
+                    error_log('✅ Created true/false question');
+                    break;
+
+                case 'short_answer':
+                    $item = new Google\Service\Forms\Item([
+                        'title' => $cleanedQuestion,
+                        'questionItem' => [
+                            'question' => [
+                                'required' => true,
+                                'textQuestion' => [
+                                    'paragraph' => true
+                                ]
+                            ]
+                        ]
+                    ]);
+                    error_log('✅ Created short answer question');
+                    break;
+
+                case 'fill_in_the_blank':
+                case 'fill_blanks':
+                    $item = new Google\Service\Forms\Item([
+                        'title' => $cleanedQuestion,
+                        'questionItem' => [
+                            'question' => [
+                                'required' => true,
+                                'textQuestion' => [
+                                    'paragraph' => false
+                                ]
+                            ]
+                        ]
+                    ]);
+                    error_log('✅ Created fill in the blank question');
+                    break;
+
+                default:
+                    // For any other question type, treat as short answer
+                    $item = new Google\Service\Forms\Item([
+                        'title' => $cleanedQuestion,
+                        'questionItem' => [
+                            'question' => [
+                                'required' => true,
+                                'textQuestion' => [
+                                    'paragraph' => true
+                                ]
+                            ]
+                        ]
+                    ]);
+                    error_log('⚠️ Unknown question type: ' . $question['type'] . ', treating as short answer');
+                    break;
+            }
+
+            // FIXED: Add each question individually like YouTube Quiz Generator
+            if ($item !== null) {
+                $request = new Google\Service\Forms\Request([
+                    'createItem' => [
+                        'item' => $item,
+                        'location' => ['index' => 0]
+                    ]
+                ]);
+
+                // Send individual request for each question
+                $service->forms->batchUpdate($form->formId, new Google\Service\Forms\BatchUpdateFormRequest([
+                    'requests' => [$request]
+                ]));
+                
+                error_log('📋 Added question ' . ($index + 1) . ' to form');
+            } else {
+                error_log('❌ Failed to create item for question at index ' . $index);
+            }
+        }
+
+        // Share the form with anyone and allow editing - Same as YouTube Quiz
+        $driveService = new Google\Service\Drive($client);
+
+        // Create a permission for anyone to access
+        $permissions = new Google\Service\Drive\Permission([
+            'type' => 'anyone',
+            'role' => 'writer'
+        ]);
+        
+        // Share the form with edit access
+        $driveService->permissions->create($form->formId, $permissions, ['sendNotificationEmail' => false]);
+        error_log('🔓 Form shared publicly with edit access');
+
+        // Provide the form edit URL back to the client
+        $form_url = 'https://docs.google.com/forms/d/' . $form->formId . '/edit';
+        error_log('🎉 Form creation completed successfully: ' . $form_url);
+        
+        wp_send_json_success([
+            'form_url' => $form_url,
+            'questions_added' => count($questions),
+            'form_id' => $form->formId
+        ]);
+
+    } catch (Exception $e) {
+        error_log('❌ Assignment Generator Google Form Export Error: ' . $e->getMessage());
+        wp_send_json_error(['message' => 'An error occurred: ' . $e->getMessage()]);
+    }
+}
+
+function render_assignment_like_youtube_quiz($questions_data, $assignment_title) {
+    $output = '<div class="assignment-quiz">';
+    $output .= '<h2>Assignment: ' . esc_html($assignment_title) . '</h2>';
+
+    if (!isset($questions_data['questions']) || !is_array($questions_data['questions'])) {
+        $output .= '<p>Error: No questions found in assignment data.</p>';
+        $output .= '</div>';
+        return $output;
+    }
+
+    foreach ($questions_data['questions'] as $index => $question) {
+        $question_number = $index + 1;
+        $output .= '<div class="question-box">';
+        $output .= '<h3>Question ' . $question_number . '</h3>';
+        $output .= '<p>' . esc_html($question['question']) . '</p>';
+        
+        switch ($question['type']) {
+            case 'multiple_choice':
+                if (isset($question['options']) && is_array($question['options'])) {
+                    foreach ($question['options'] as $option_letter => $option_text) {
+                        $output .= '<label>';
+                        $output .= '<input type="radio" name="q' . $question_number . '" value="' . $option_letter . '"> ';
+                        $output .= esc_html($option_letter . ') ' . $option_text);
+                        $output .= '</label><br>';
+                    }
+                }
+                break;
+
+            case 'true_false':
+                if (isset($question['options']) && is_array($question['options'])) {
+                    foreach ($question['options'] as $option_letter => $option_text) {
+                        $output .= '<label>';
+                        $output .= '<input type="radio" name="q' . $question_number . '" value="' . $option_letter . '"> ';
+                        $output .= esc_html($option_letter . ') ' . $option_text);
+                        $output .= '</label><br>';
+                    }
+                } else {
+                    // Fallback for true/false
+                    $output .= '<label>';
+                    $output .= '<input type="radio" name="q' . $question_number . '" value="A"> A) True';
+                    $output .= '</label><br>';
+                    $output .= '<label>';
+                    $output .= '<input type="radio" name="q' . $question_number . '" value="B"> B) False';
+                    $output .= '</label><br>';
+                }
+                break;
+
+            case 'short_answer':
+                $output .= '<textarea name="q' . $question_number . '" rows="3" class="short-answer-input" placeholder="Type your answer here"></textarea>';
+                break;
+
+            case 'fill_in_the_blank':
+                $output .= '<input type="text" name="q' . $question_number . '" class="fill-blank-input" placeholder="Fill in the blank">';
+                break;
+        }
+        
+        // Store question type and correct answer in hidden fields
+        $output .= '<input type="hidden" class="question-type" value="' . esc_attr($question['type']) . '">';
+        $output .= '<input type="hidden" class="correct-answer" value="' . esc_attr($question['correct_answer']) . '">';
+        $output .= '</div>';
+    }
+    
+    $output .= '</div>';
+    return $output;
+}
+
+
+
+// NEW: Helper function to clean question text for Google Forms
+function cleanQuestionTextForGoogleForms($text) {
+    // Remove HTML tags
+    $cleaned = strip_tags($text);
+    
+    // Remove newlines, carriage returns, and extra whitespace
+    $cleaned = str_replace(["\n", "\r", "\t"], ' ', $cleaned);
+    
+    // Replace multiple spaces with single space
+    $cleaned = preg_replace('/\s+/', ' ', $cleaned);
+    
+    // Trim whitespace from beginning and end
+    $cleaned = trim($cleaned);
+    
+    // Limit length if too long (Google Forms has limits)
+    if (strlen($cleaned) > 1000) {
+        $cleaned = substr($cleaned, 0, 997) . '...';
+    }
+    
+    return $cleaned;
+}
+
+
+
+// Function to get Google client (reused from YouTube Quiz Generator setup)
+function get_google_client_for_assignment() {
+    if (!class_exists('Google\Client')) {
+        throw new Exception('Google API Client library not found. Please ensure it is installed correctly.');
+    }
+
+    $client = new Google\Client();
+    
+    // Try to find the service account JSON file in YouTube Quiz Generator plugin directory first
+    $service_account_paths = [
+        plugin_dir_path(__FILE__) . '../youtube-video-quiz-generator/service-account.json',
+        plugin_dir_path(__FILE__) . 'service-account.json'
+    ];
+    
+    $service_account_json_path = null;
+    foreach ($service_account_paths as $path) {
+        if (file_exists($path)) {
+            $service_account_json_path = $path;
+            break;
+        }
+    }
+
+    if (!$service_account_json_path) {
+        throw new Exception('Service Account JSON file not found. Please ensure the file is located in the plugin directory or YouTube Quiz Generator plugin directory.');
+    }
+
+    // Set the credentials
+    $client->setAuthConfig($service_account_json_path);
+
+    // Set the scopes
+    $client->addScope('https://www.googleapis.com/auth/drive');
+    $client->addScope('https://www.googleapis.com/auth/forms');
+    $client->setAccessType('offline');
+    $client->setPrompt('consent');
+
+    return $client;
+}
+
+function handle_process_file_with_mistral() {
+    error_log("🔥 Enhanced Mistral AJAX handler called for multiple files support!");
+    error_log("POST data: " . print_r($_POST, true));
+    error_log("FILES data: " . print_r($_FILES, true));
+    
+    // Verify AJAX request
+    if (!wp_doing_ajax()) {
+        error_log("❌ Not an AJAX request");
+        wp_send_json_error('Invalid request');
+        return;
+    }
+
+    // Check if file was uploaded
+    if (!isset($_FILES['file']) || $_FILES['file']['error'] !== UPLOAD_ERR_OK) {
+        error_log("❌ No file uploaded or upload error: " . ($_FILES['file']['error'] ?? 'No file'));
+        wp_send_json_error('No file uploaded or upload error occurred');
+        return;
+    }
+
+    $uploaded_file = $_FILES['file'];
+    $file_name = sanitize_file_name($uploaded_file['name']);
+    $file_type = $uploaded_file['type'];
+    $tmp_name = $uploaded_file['tmp_name'];
+    
+    // Get file index if provided (for tracking multiple files)
+    $file_index = isset($_POST['file_index']) ? intval($_POST['file_index']) : 0;
+
+    error_log("🔄 Processing file #$file_index with Mistral: $file_name (Type: $file_type)");
+
+    // Validate file type
+    $allowed_types = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'];
+    if (!in_array(strtolower($file_type), $allowed_types)) {
+        error_log("❌ Unsupported file type: $file_type");
+        wp_send_json_error('Unsupported file type. Please upload PDF, JPG, JPEG, or PNG files.');
+        return;
+    }
+
+    // Create uploads directory if it doesn't exist
+    $upload_dir = wp_upload_dir();
+    $assignment_upload_dir = $upload_dir['basedir'] . '/assignment-files/';
+    
+    if (!file_exists($assignment_upload_dir)) {
+        wp_mkdir_p($assignment_upload_dir);
+        error_log("📁 Created directory: $assignment_upload_dir");
+    }
+
+    // Generate unique file path with index
+    $file_extension = pathinfo($file_name, PATHINFO_EXTENSION);
+    $unique_filename = 'assignment_' . time() . '_' . $file_index . '_' . wp_generate_password(8, false) . '.' . $file_extension;
+    $file_path = $assignment_upload_dir . $unique_filename;
+
+    error_log("💾 Saving file #$file_index to: $file_path");
+
+    // Move uploaded file
+    if (!move_uploaded_file($tmp_name, $file_path)) {
+        error_log("❌ Failed to move uploaded file from $tmp_name to $file_path");
+        wp_send_json_error('Failed to save uploaded file');
+        return;
+    }
+
+    error_log("✅ File #$file_index successfully saved to: $file_path");
+
+    try {
+        // Extract text using Mistral OCR
+        error_log("🚀 Starting Mistral OCR extraction for file #$file_index...");
+        $extracted_text = extract_text_from_file_mistral_assignment($file_path, $file_type);
+        
+        error_log("📝 Mistral extraction result for file #$file_index: " . substr($extracted_text, 0, 200) . "...");
+        
+        // Clean up - delete the temporary file
+        if (file_exists($file_path)) {
+            unlink($file_path);
+            error_log("🗑️ Cleaned up temporary file: $file_path");
+        }
+
+        // Check if extraction was successful
+        if (strpos($extracted_text, 'Error:') === 0 || strpos($extracted_text, 'OCR') === 0) {
+            error_log("❌ Mistral extraction failed for file #$file_index: $extracted_text");
+            wp_send_json_error([
+                'message' => $extracted_text,
+                'file_name' => $file_name,
+                'file_type' => $file_type,
+                'file_index' => $file_index
+            ]);
+            return;
+        }
+
+        error_log("✅ Mistral extraction successful for file #$file_index. Text length: " . strlen($extracted_text));
+
+        // Success response with file index
+        wp_send_json_success([
+            'extracted_text' => $extracted_text,
+            'file_name' => $file_name,
+            'file_type' => $file_type,
+            'file_index' => $file_index,
+            'text_length' => strlen($extracted_text),
+            'word_count' => str_word_count($extracted_text)
+        ]);
+
+    } catch (Exception $e) {
+        // Clean up file on error
+        if (file_exists($file_path)) {
+            unlink($file_path);
+        }
+        
+        error_log("❌ Mistral processing exception for file #$file_index: " . $e->getMessage());
+        wp_send_json_error('An error occurred while processing file #' . ($file_index + 1) . ': ' . $e->getMessage());
+    }
+}
+
+function get_saved_activities_callback() {
+    // Enable detailed error reporting
+    error_reporting(E_ALL);
+    ini_set('display_errors', 1);
+    
+    // Log the start of the function
+    error_log('DEBUG: get_saved_activities_callback started');
+
+    // Verify AJAX request
+    if (!wp_doing_ajax()) {
+        error_log('DEBUG: Not an AJAX request');
+        wp_send_json_error('Invalid request type');
+        exit;
+    }
+
+    // Check user authentication - Allow non-logged in users for testing
+    if (!is_user_logged_in()) {
+        error_log('DEBUG: User not logged in, sending test data');
+        // For testing - send some dummy data if not logged in
+        wp_send_json_success([
+            [
+                'id' => '0',
+                'title' => 'Test Item (Demo)',
+                'content' => '<p>This is test content</p>',
+                'tool_type' => 'test',
+                'created_at' => date('Y-m-d H:i:s'),
+                'grade' => '5th',
+                'subject' => 'Science',
+                'topic' => 'Solar System',
+                'language' => 'English'
+            ]
+        ]);
+        exit;
+    }
+
+    $user_id = get_current_user_id();
+    error_log("DEBUG: Current User ID = $user_id");
+
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'eduai_tool_data';
+    
+    // Verify table exists
+    if ($wpdb->get_var("SHOW TABLES LIKE '$table_name'") != $table_name) {
+        error_log("DEBUG: Table $table_name does not exist");
+        wp_send_json_error('Database table not found');
+        exit;
+    }
+
+    try {
+        // Get all columns from the table
+        $columns = $wpdb->get_results("SHOW COLUMNS FROM $table_name");
+        error_log("DEBUG: Table columns: " . print_r($columns, true));
+        
+        // Fetch ALL items regardless of tool type
+        $query = $wpdb->prepare(
+            "SELECT id, title, content, metadata, tool_type, created_at
+            FROM $table_name 
+            WHERE user_id = %d
+            ORDER BY created_at DESC", 
+            $user_id
+        );
+        
+        error_log("DEBUG: SQL Query = $query");
+
+        $items = $wpdb->get_results($query, ARRAY_A);
+
+        // Log raw database results
+        error_log('DEBUG: Raw Database Results count: ' . count($items));
+        if (count($items) > 0) {
+            error_log('DEBUG: First item sample: ' . print_r($items[0], true));
+        }
+
+        // If no items found, return an empty array
+        if (empty($items)) {
+            error_log('DEBUG: No items found for this user');
+            
+            // For testing - return a dummy item showing we're correctly searching all items
+            wp_send_json_success([
+                [
+                    'id' => '0',
+                    'title' => 'No Saved Items Found (From Any Tool)',
+                    'content' => '<p>No saved items found in your library</p>',
+                    'tool_type' => 'demo',
+                    'created_at' => date('Y-m-d H:i:s'),
+                    'grade' => 'Any',
+                    'subject' => 'Any',
+                    'topic' => 'Example Topic',
+                    'language' => 'English'
+                ]
+            ]);
+            exit;
+        }
+
+        // Process items with robust error handling
+        $cleaned_items = [];
+        foreach ($items as $item) {
+            try {
+                // Safely parse metadata
+                $metadata = json_decode($item['metadata'], true);
+                if (json_last_error() !== JSON_ERROR_NONE) {
+                    error_log('DEBUG: JSON parse error for item ID ' . $item['id'] . ': ' . json_last_error_msg());
+                    $metadata = [];
+                }
+                
+                // Provide default values and sanitize
+                $cleaned_item = [
+                    'id' => $item['id'],
+                    'title' => !empty($item['title']) ? sanitize_text_field($item['title']) : 'Untitled',
+                    'content' => !empty($item['content']) ? wp_kses_post($item['content']) : '',
+                    'tool_type' => !empty($item['tool_type']) ? sanitize_text_field($item['tool_type']) : 'test',
+                    'created_at' => $item['created_at'],
+                    'grade' => isset($metadata['grade_level']) ? sanitize_text_field($metadata['grade_level']) : '',
+                    'subject' => isset($metadata['subject']) ? sanitize_text_field($metadata['subject']) : '',
+                    'topic' => isset($metadata['topic']) ? sanitize_text_field($metadata['topic']) : '',
+                    'language' => isset($metadata['language']) ? sanitize_text_field($metadata['language']) : ''
+                ];
+
+                $cleaned_items[] = $cleaned_item;
+            } catch (Exception $e) {
+                error_log('DEBUG: Error processing item: ' . $e->getMessage());
+                // Continue to next item
+            }
+        }
+
+        // Log cleaned items count
+        error_log('DEBUG: Cleaned Items count: ' . count($cleaned_items));
+
+        wp_send_json_success($cleaned_items);
+        exit;
+
+    } catch (Exception $e) {
+        error_log('DEBUG: Exception occurred - ' . $e->getMessage());
+        wp_send_json_error('An error occurred while fetching saved items');
+        exit;
+    }
+}
+
+function save_assignment_to_library() {
+    global $wpdb;
+
+    // Check if the user is logged in
+    if (!is_user_logged_in()) {
+        wp_send_json_error('You must be logged in to save a test.');
+        return;
+    }
+
+    $user_id = get_current_user_id();
+    $test_title = sanitize_text_field($_POST['test_title']);
+    $test_content = wp_kses_post($_POST['test_content']); // Store formatted HTML
+    
+    // Get additional metadata
+    $grade_level = isset($_POST['grade_level']) ? sanitize_text_field($_POST['grade_level']) : '';
+    $subject = isset($_POST['subject']) ? sanitize_text_field($_POST['subject']) : '';
+    $language = isset($_POST['language']) ? sanitize_text_field($_POST['language']) : '';
+    $topic = isset($_POST['topic']) ? sanitize_text_field($_POST['topic']) : '';
+    
+    // Prepare metadata as JSON
+    $metadata = json_encode(array(
+        'grade_level' => $grade_level,
+        'subject' => $subject,
+        'language' => $language,
+        'topic' => $topic
+    ));
+
+    // Using the universal table
+    $table_name = $wpdb->prefix . 'eduai_tool_data';
+    
+    // Ensure the table exists
+    if ($wpdb->get_var("SHOW TABLES LIKE '$table_name'") != $table_name) {
+        // Call the function to create the table if it doesn't exist
+        create_eduai_universal_tool_data_table();
+    }
+
+    // Insert into the database
+    $inserted = $wpdb->insert(
+        $table_name,
+        array(
+            'user_id' => $user_id,
+            'tool_type' => 'test',  // Type for tests
+            'title' => $test_title,
+            'content' => $test_content,
+            'metadata' => $metadata,
+            'created_at' => current_time('mysql')
+        ),
+        array('%d', '%s', '%s', '%s', '%s', '%s')
+    );
+
+    if ($inserted) {
+        wp_send_json_success(array(
+            'message' => 'Test saved successfully.',
+            'redirect' => site_url('/eduaihub/user-account/my-library')
+        ));
+    } else {
+        wp_send_json_error('Database error: ' . $wpdb->last_error);
+    }
+}
+
+function assignment_generator_styles() {
+    // Get the plugin directory URL
+    $plugin_url = plugin_dir_url(__FILE__);
+    
+    // Enqueue the CSS file
+    wp_enqueue_style(
+        'assignment-generator-styles', // Unique handle for the stylesheet
+        $plugin_url . 'assignment-generator-styles.css', // Path to the CSS file
+        array(), // Dependencies (none in this case)
+        '1.2' // Version number (can match your plugin version)
+    );
+}
+add_action('wp_enqueue_scripts', 'assignment_generator_styles');
+
+// ENHANCED: Handle generate assignment with answer sheet generation
+function handle_generate_assignment() {
+    $grade = sanitize_text_field($_POST['grade']);
+    $topic = sanitize_text_field($_POST['topic']);
+    $subject = sanitize_text_field($_POST['subject']); 
+    $language = sanitize_text_field($_POST['language']);
+    
+    // Get question counts
+    $mcq_count = isset($_POST['mcq_count']) ? intval($_POST['mcq_count']) : 0;
+    $fill_in_the_blanks_count = isset($_POST['fill_blanks_count']) ? intval($_POST['fill_blanks_count']) : 0;
+    $true_false_count = isset($_POST['true_false_count']) ? intval($_POST['true_false_count']) : 0;
+    $write_in_short_count = isset($_POST['short_answer_count']) ? intval($_POST['short_answer_count']) : 0;
+    
+    // NEW: Check if answer sheet generation is requested
+    $generate_answer_sheet = isset($_POST['generate_answer_sheet']) && $_POST['generate_answer_sheet'] === 'true';
+    
+    // Log the received values for debugging
+    error_log("ENHANCED: Assignment generation - Question counts received:");
+    error_log("MCQ: $mcq_count, Fill Blanks: $fill_in_the_blanks_count, True/False: $true_false_count, Short Answer: $write_in_short_count");
+    error_log("Generate Answer Sheet: " . ($generate_answer_sheet ? 'YES' : 'NO'));
+    
+    // Get the saved item content and extracted content from multiple files
+    $saved_item_content = isset($_POST['saved_item_content']) ? $_POST['saved_item_content'] : '';
+    $extracted_file_content = isset($_POST['extracted_file_content']) ? $_POST['extracted_file_content'] : '';
+    
+    // Log the extracted content information
+    if (!empty($extracted_file_content)) {
+        $content_length = strlen($extracted_file_content);
+        $file_count = substr_count($extracted_file_content, '--- Next File ---') + 1;
+        error_log("MULTIPLE FILES: Received combined content from $file_count files, total length: $content_length characters");
+    }
+
+    // Validate the number of questions
+    if ($mcq_count > 10 || $fill_in_the_blanks_count > 10 || $true_false_count > 10 || $write_in_short_count > 10) {
+        wp_send_json_error('The number of questions for each section must be 10 or fewer.');
+        return;
+    }
+
+    // Check if at least one question type is selected
+    if ($mcq_count === 0 && $fill_in_the_blanks_count === 0 && $true_false_count === 0 && $write_in_short_count === 0) {
+        wp_send_json_error('Please select at least one question type and specify the number of questions.');
+        return;
+    }
+
+    // ENHANCED: Build prompt for test generation
+    $test_prompt = build_test_generation_prompt($topic, $grade, $subject, $language, 
+                                               $mcq_count, $fill_in_the_blanks_count, 
+                                               $true_false_count, $write_in_short_count,
+                                               $extracted_file_content, $saved_item_content);
+
+    error_log("Sending enhanced test generation prompt to OpenAI...");
+
+    // Generate the test
+    $test_response = assignment_openai_api_call('gpt-3.5-turbo', $test_prompt);
+
+    if (is_wp_error($test_response)) {
+        wp_send_json_error($test_response->get_error_message());
+        return;
+    }
+
+    // Validate and process test response
+    $answer_sheet_data = null;
+    
+    if (is_array($test_response) && isset($test_response['questions'])) {
+        $validation_result = validate_question_types($test_response['questions'], $mcq_count, $true_false_count, $fill_in_the_blanks_count, $write_in_short_count);
+        
+        if ($validation_result['valid']) {
+            $questions_data = $test_response;
+            $assignment_title = "$grade - $subject - $topic";
+            
+            // Generate HTML display for test
+            $assignment_html = render_assignment_like_youtube_quiz($questions_data, $assignment_title);
+            
+            // NEW: Generate answer sheet if requested
+            if ($generate_answer_sheet) {
+                error_log("🔄 Generating answer sheet for test...");
+                $answer_sheet_data = generate_answer_sheet($questions_data, $assignment_title, $grade, $subject, $language);
+                error_log("✅ Answer sheet generation completed");
+            }
+            
+            // Return structured data with answer sheet
+            $response_data = array(
+                'assignment_html' => $assignment_html,
+                'questions' => $questions_data,
+                'assignment_title' => $assignment_title,
+                'grade' => $grade,
+                'subject' => $subject,
+                'language' => $language
+            );
+            
+            // NEW: Add answer sheet to response if generated
+            if ($answer_sheet_data) {
+                $response_data['answer_sheet'] = $answer_sheet_data;
+                error_log("📋 Answer sheet added to response data");
+            }
+            
+            wp_send_json_success($response_data);
+            
+        } else {
+            error_log("Question type validation failed: " . $validation_result['error']);
+            wp_send_json_error("Generated questions don't match requested types. Please try again. Error: " . $validation_result['error']);
+        }
+    } else {
+        // Fallback handling for text format
+        error_log("Received text format, attempting to parse...");
+        
+        if (is_string($test_response)) {
+            $json_start = strpos($test_response, '{');
+            $json_end = strrpos($test_response, '}');
+            
+            if ($json_start !== false && $json_end !== false) {
+                $json_content = substr($test_response, $json_start, $json_end - $json_start + 1);
+                $parsed_data = json_decode($json_content, true);
+                
+                if (json_last_error() === JSON_ERROR_NONE && isset($parsed_data['questions'])) {
+                    $validation_result = validate_question_types($parsed_data['questions'], $mcq_count, $true_false_count, $fill_in_the_blanks_count, $write_in_short_count);
+                    
+                    if ($validation_result['valid']) {
+                        $questions_data = $parsed_data;
+                        $assignment_title = "$grade - $subject - $topic";
+                        $assignment_html = render_assignment_like_youtube_quiz($questions_data, $assignment_title);
+                        
+                        // NEW: Generate answer sheet if requested
+                        if ($generate_answer_sheet) {
+                            error_log("🔄 Generating answer sheet for parsed test...");
+                            $answer_sheet_data = generate_answer_sheet($questions_data, $assignment_title, $grade, $subject, $language);
+                            error_log("✅ Answer sheet generation completed for parsed test");
+                        }
+                        
+                        $response_data = array(
+                            'assignment_html' => $assignment_html,
+                            'questions' => $questions_data,
+                            'assignment_title' => $assignment_title,
+                            'grade' => $grade,
+                            'subject' => $subject,
+                            'language' => $language
+                        );
+                        
+                        // NEW: Add answer sheet to response if generated
+                        if ($answer_sheet_data) {
+                            $response_data['answer_sheet'] = $answer_sheet_data;
+                        }
+                        
+                        wp_send_json_success($response_data);
+                        return;
+                    } else {
+                        error_log("Parsed question validation failed: " . $validation_result['error']);
+                        wp_send_json_error("Generated questions don't match requested types. Please try again.");
+                        return;
+                    }
+                }
+            }
+        }
+        
+        // Final fallback: return as formatted text
+        wp_send_json_success($test_response);
+    }
+}
+
+
+// NEW: Function to generate answer sheet
+function generate_answer_sheet($questions_data, $assignment_title, $grade, $subject, $language) {
+    error_log("📋 Starting answer sheet generation...");
+    
+    if (!isset($questions_data['questions']) || !is_array($questions_data['questions'])) {
+        error_log("❌ No questions data available for answer sheet generation");
+        return null;
+    }
+    
+    $questions = $questions_data['questions'];
+    $total_questions = count($questions);
+    
+    error_log("📊 Generating answer sheet for $total_questions questions");
+    
+    // Build answer sheet prompt
+    $answer_prompt = build_answer_sheet_prompt($questions, $assignment_title, $grade, $subject, $language);
+    
+    // Call OpenAI to generate detailed answer sheet
+    $answer_response = assignment_openai_api_call('gpt-3.5-turbo', $answer_prompt);
+    
+    if (is_wp_error($answer_response)) {
+        error_log("❌ Error generating answer sheet: " . $answer_response->get_error_message());
+        // Fallback: create basic answer sheet from existing data
+        return generate_basic_answer_sheet($questions, $assignment_title);
+    }
+    
+    // Process the answer sheet response
+    if (is_string($answer_response)) {
+        // Try to parse as JSON first
+        $json_start = strpos($answer_response, '{');
+        $json_end = strrpos($answer_response, '}');
+        
+        if ($json_start !== false && $json_end !== false) {
+            $json_content = substr($answer_response, $json_start, $json_end - $json_start + 1);
+            $parsed_answer_data = json_decode($json_content, true);
+            
+            if (json_last_error() === JSON_ERROR_NONE && isset($parsed_answer_data['answers'])) {
+                error_log("✅ Answer sheet generated successfully as JSON");
+                return array(
+                    'type' => 'structured',
+                    'questions' => $parsed_answer_data['answers'],
+                    'html' => format_answer_sheet_html($parsed_answer_data['answers'], $assignment_title)
+                );
+            }
+        }
+        
+        // If not JSON, treat as formatted text/HTML
+        error_log("✅ Answer sheet generated as formatted text");
+        return array(
+            'type' => 'text',
+            'html' => $answer_response,
+            'raw_text' => $answer_response
+        );
+    }
+    
+    // Fallback if response is not processable
+    error_log("⚠️ Using fallback answer sheet generation");
+    return generate_basic_answer_sheet($questions, $assignment_title);
+}
+
+function build_answer_sheet_prompt($questions, $assignment_title, $grade, $subject, $language) {
+    $prompt = "You are an expert educator creating a comprehensive model answer sheet. Generate detailed answers for each question.
+
+ASSIGNMENT DETAILS:
+- Title: $assignment_title
+- Grade: $grade
+- Subject: $subject
+- Language: $language
+
+INSTRUCTIONS:
+1. Provide detailed, correct answers for each question
+2. For multiple choice: Explain WHY the correct answer is right and others are wrong
+3. For fill-in-the-blank: Provide the correct word/phrase with brief explanation
+4. For true/false: State the correct answer and provide reasoning
+5. For short answer: Provide comprehensive model answers with key points
+6. Use [$language] language for all answers
+7. Include explanations that would help students understand the concepts
+
+QUESTIONS TO ANSWER:\n\n";
+
+    foreach ($questions as $index => $question) {
+        $q_num = $index + 1;
+        $prompt .= "Question $q_num: " . $question['question'] . "\n";
+        $prompt .= "Type: " . $question['type'] . "\n";
+        
+        if (isset($question['options']) && is_array($question['options'])) {
+            $prompt .= "Options: " . json_encode($question['options']) . "\n";
+        }
+        
+        if (isset($question['correct_answer'])) {
+            $prompt .= "Given Answer: " . $question['correct_answer'] . "\n";
+        }
+        
+        $prompt .= "\n";
+    }
+
+    $prompt .= "\nRESPONSE FORMAT - Respond with JSON in this exact structure:
+{
+    \"answers\": [";
+
+    $answer_examples = [];
+    foreach ($questions as $index => $question) {
+        $q_num = $index + 1;
+        
+        switch ($question['type']) {
+            case 'multiple_choice':
+                $answer_examples[] = "        {
+            \"question_number\": $q_num,
+            \"question\": \"" . addslashes($question['question']) . "\",
+            \"correct_answer\": \"A\",
+            \"explanation\": \"Detailed explanation of why A is correct and why B, C, D are incorrect\"
+        }";
+                break;
+                
+            case 'true_false':
+                $answer_examples[] = "        {
+            \"question_number\": $q_num,
+            \"question\": \"" . addslashes($question['question']) . "\",
+            \"correct_answer\": \"True\",
+            \"explanation\": \"Explanation of why this statement is true/false\"
+        }";
+                break;
+                
+            case 'fill_in_the_blank':
+                $answer_examples[] = "        {
+            \"question_number\": $q_num,
+            \"question\": \"" . addslashes($question['question']) . "\",
+            \"correct_answer\": \"correct word or phrase\",
+            \"explanation\": \"Brief explanation of the answer\"
+        }";
+                break;
+                
+            case 'short_answer':
+                $answer_examples[] = "        {
+            \"question_number\": $q_num,
+            \"question\": \"" . addslashes($question['question']) . "\",
+            \"correct_answer\": \"Comprehensive model answer with key points\",
+            \"explanation\": \"Additional context or teaching points\"
+        }";
+                break;
+        }
+    }
+
+    $prompt .= "\n" . implode(",\n", $answer_examples) . "\n    ]\n}";
+
+    $prompt .= "\n\nIMPORTANT:
+- Provide accurate, educational answers appropriate for $grade level
+- Include explanations that help students learn
+- Use clear, understandable language in $language
+- Ensure all answers are pedagogically sound
+- Respond with ONLY the JSON structure above";
+
+    return $prompt;
+}
+
+// / NEW: Generate basic answer sheet as fallback
+function generate_basic_answer_sheet($questions, $assignment_title) {
+    error_log("📋 Generating basic fallback answer sheet...");
+    
+    $answers = array();
+    
+    foreach ($questions as $index => $question) {
+        $answer = array(
+            'question_number' => $index + 1,
+            'question' => $question['question'],
+            'correct_answer' => isset($question['correct_answer']) ? $question['correct_answer'] : 'Answer not specified',
+            'explanation' => 'Refer to course materials for detailed explanation'
+        );
+        
+        $answers[] = $answer;
+    }
+    
+    return array(
+        'type' => 'basic',
+        'questions' => $answers,
+        'html' => format_answer_sheet_html($answers, $assignment_title)
+    );
+}
+
+// NEW: Format answer sheet as HTML
+function format_answer_sheet_html($answers, $assignment_title) {
+    $html = '<div class="model-answer-sheet">';
+    $html .= '<div style="text-align: center; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 2px solid #0073aa;">';
+    $html .= '<h2 style="color: #0073aa; margin: 0;">📋 Model Answer Sheet</h2>';
+    $html .= '<h3 style="color: #666; margin: 5px 0 0 0;">' . esc_html($assignment_title) . '</h3>';
+    $html .= '</div>';
+    
+    foreach ($answers as $answer) {
+        $html .= '<div style="margin-bottom: 25px; padding: 20px; background: #f8f9fa; border-left: 5px solid #28a745; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">';
+        
+        // Question header
+        $html .= '<div style="margin-bottom: 15px;">';
+        $html .= '<h4 style="margin: 0; color: #333; font-size: 16px;">Question ' . $answer['question_number'] . '</h4>';
+        $html .= '<p style="margin: 8px 0; color: #555; font-style: italic;">' . esc_html($answer['question']) . '</p>';
+        $html .= '</div>';
+        
+        // Answer section
+        $html .= '<div style="background: white; padding: 15px; border-radius: 6px; border: 1px solid #e9ecef;">';
+        $html .= '<div style="margin-bottom: 10px;">';
+        $html .= '<strong style="color: #28a745; font-size: 14px;">✓ Correct Answer:</strong>';
+        $html .= '<div style="margin-top: 5px; padding: 8px 12px; background: #d4edda; border-radius: 4px; border-left: 3px solid #28a745;">';
+        $html .= '<span style="font-weight: 500; color: #155724;">' . esc_html($answer['correct_answer']) . '</span>';
+        $html .= '</div>';
+        $html .= '</div>';
+        
+        // Explanation if available
+        if (!empty($answer['explanation']) && $answer['explanation'] !== 'Refer to course materials for detailed explanation') {
+            $html .= '<div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #e9ecef;">';
+            $html .= '<strong style="color: #6c757d; font-size: 14px;">📝 Explanation:</strong>';
+            $html .= '<p style="margin: 5px 0 0 0; color: #6c757d; line-height: 1.5;">' . esc_html($answer['explanation']) . '</p>';
+            $html .= '</div>';
+        }
+        
+        $html .= '</div>'; // Close answer section
+        $html .= '</div>'; // Close question container
+    }
+    
+    $html .= '</div>'; // Close answer sheet
+    
+    return $html;
+}
+
+// NEW: Build test generation prompt (extracted for better organization)
+function build_test_generation_prompt($topic, $grade, $subject, $language, $mcq_count, $fill_in_the_blanks_count, $true_false_count, $write_in_short_count, $extracted_file_content, $saved_item_content) {
+    
+    $prompt = "You are a quiz generator that creates EXACTLY the requested number of questions for each type. You must follow the requirements PRECISELY without adding extra questions.
+
+ASSIGNMENT DETAILS:
+- Topic: '$topic'
+- Grade: $grade
+- Subject: $subject  
+- Language: $language
+
+STRICT REQUIREMENTS - Generate EXACTLY these question types and counts:";
+
+    // Build the questions array specification
+    $total_questions = $mcq_count + $fill_in_the_blanks_count + $true_false_count + $write_in_short_count;
+    $question_index = 1;
+    
+    $questions_spec = [];
+    
+    // Add MCQ specifications
+    for ($i = 0; $i < $mcq_count; $i++) {
+        $questions_spec[] = "Question $question_index: Multiple Choice with exactly 4 options (A, B, C, D)";
+        $question_index++;
+    }
+    
+    // Add True/False specifications  
+    for ($i = 0; $i < $true_false_count; $i++) {
+        $questions_spec[] = "Question $question_index: True/False with exactly 2 options (True, False)";
+        $question_index++;
+    }
+    
+    // Add Fill in the Blank specifications
+    for ($i = 0; $i < $fill_in_the_blanks_count; $i++) {
+        $questions_spec[] = "Question $question_index: Fill in the Blank with one correct answer";
+        $question_index++;
+    }
+    
+    // Add Short Answer specifications
+    for ($i = 0; $i < $write_in_short_count; $i++) {
+        $questions_spec[] = "Question $question_index: Short Answer with expected answer";
+        $question_index++;
+    }
+
+    $prompt .= "\n\nTOTAL QUESTIONS TO GENERATE: EXACTLY $total_questions questions\n";
+    $prompt .= implode("\n", $questions_spec);
+
+    // Add reference content with better handling for multiple files
+    if (!empty($extracted_file_content)) {
+        // Check if content contains multiple file markers
+        if (strpos($extracted_file_content, '--- Next File ---') !== false) {
+            $prompt .= "\n\nMULTIPLE FILES CONTENT REFERENCE:\nBase questions on the content from these uploaded documents. The content below is from multiple files separated by '--- Next File ---' markers:\n\n=== COMBINED EXTRACTED CONTENT ===\n$extracted_file_content\n=== END CONTENT ===\n";
+        } else {
+            $prompt .= "\n\nCONTENT REFERENCE:\nBase questions on this extracted document content:\n\n=== EXTRACTED CONTENT ===\n$extracted_file_content\n=== END CONTENT ===\n";
+        }
+        
+        // Add instruction to utilize all file content
+        $prompt .= "\nIMPORTANT: Create questions that cover content from ALL uploaded files, not just the first one. Ensure questions are diverse and representative of all the provided material.\n";
+        
+    } elseif (!empty($saved_item_content)) {
+        $prompt .= "\n\nCONTENT REFERENCE:\nBase questions on this saved content:\n\n=== SAVED CONTENT ===\n$saved_item_content\n=== END CONTENT ===\n";
+    }
+
+    // Build the expected JSON structure dynamically
+    $prompt .= "\n\nRESPONSE FORMAT - You MUST respond with EXACTLY this JSON structure:
+{
+    \"questions\": [";
+
+    // Build the expected JSON structure dynamically
+    $json_examples = [];
+    $question_index = 1;
+    
+    // Add MCQ examples
+    for ($i = 0; $i < $mcq_count; $i++) {
+        $json_examples[] = "        {
+            \"question\": \"Multiple choice question $question_index text here\",
+            \"type\": \"multiple_choice\",
+            \"options\": {
+                \"A\": \"Option A text\",
+                \"B\": \"Option B text\", 
+                \"C\": \"Option C text\",
+                \"D\": \"Option D text\"
+            },
+            \"correct_answer\": \"A\"
+        }";
+        $question_index++;
+    }
+    
+    // Add True/False examples
+    for ($i = 0; $i < $true_false_count; $i++) {
+        $json_examples[] = "        {
+            \"question\": \"True or false question $question_index statement here\",
+            \"type\": \"true_false\",
+            \"options\": {
+                \"A\": \"True\",
+                \"B\": \"False\"
+            },
+            \"correct_answer\": \"A\"
+        }";
+        $question_index++;
+    }
+    
+    // Add Fill in the Blank examples
+    for ($i = 0; $i < $fill_in_the_blanks_count; $i++) {
+        $json_examples[] = "        {
+            \"question\": \"Fill in the blank question $question_index: Complete this sentence _____ here\",
+            \"type\": \"fill_in_the_blank\",
+            \"correct_answer\": \"correct word or phrase\"
+        }";
+        $question_index++;
+    }
+    
+    // Add Short Answer examples
+    for ($i = 0; $i < $write_in_short_count; $i++) {
+        $json_examples[] = "        {
+            \"question\": \"Short answer question $question_index here\",
+            \"type\": \"short_answer\",
+            \"correct_answer\": \"expected detailed answer\"
+        }";
+        $question_index++;
+    }
+
+    $prompt .= "\n" . implode(",\n", $json_examples) . "\n    ]\n}";
+
+    $prompt .= "\n\nCRITICAL RULES:
+1. Generate questions in [$language] language
+2. Generate EXACTLY $total_questions questions total
+3. MCQ questions: EXACTLY $mcq_count questions with type \"multiple_choice\"
+4. True/False questions: EXACTLY $true_false_count questions with type \"true_false\"  
+5. Fill in the Blank questions: EXACTLY $fill_in_the_blanks_count questions with type \"fill_in_the_blank\"
+6. Short Answer questions: EXACTLY $write_in_short_count questions with type \"short_answer\"
+7. Do NOT mix question types - each question must be EXACTLY the specified type
+8. Do NOT add extra questions beyond the requested counts
+9. Do NOT include explanatory text outside the JSON
+10. Vary the correct answers for multiple choice (don't always use A)
+11. If multiple files were provided, create questions that utilize content from ALL files, not just one
+12. IMPORTANT: Ensure each question has a clear, definitive correct_answer field
+
+RESPOND WITH ONLY THE JSON - NO ADDITIONAL TEXT OR FORMATTING";
+
+    return $prompt;
+}
+
+
+function validate_question_types($questions, $expected_mcq, $expected_tf, $expected_fib, $expected_sa) {
+    if (!is_array($questions)) {
+        return ['valid' => false, 'error' => 'Questions is not an array'];
+    }
+    
+    // Count actual question types
+    $actual_mcq = 0;
+    $actual_tf = 0; 
+    $actual_fib = 0;
+    $actual_sa = 0;
+    
+    foreach ($questions as $question) {
+        if (!isset($question['type'])) {
+            return ['valid' => false, 'error' => 'Question missing type field'];
+        }
+        
+        switch ($question['type']) {
+            case 'multiple_choice':
+                $actual_mcq++;
+                break;
+            case 'true_false':
+                $actual_tf++;
+                break;
+            case 'fill_in_the_blank':
+                $actual_fib++;
+                break;
+            case 'short_answer':
+                $actual_sa++;
+                break;
+            default:
+                return ['valid' => false, 'error' => 'Unknown question type: ' . $question['type']];
+        }
+    }
+    
+    // Check if counts match exactly
+    if ($actual_mcq !== $expected_mcq) {
+        return ['valid' => false, 'error' => "Expected $expected_mcq MCQ, got $actual_mcq"];
+    }
+    if ($actual_tf !== $expected_tf) {
+        return ['valid' => false, 'error' => "Expected $expected_tf True/False, got $actual_tf"];
+    }
+    if ($actual_fib !== $expected_fib) {
+        return ['valid' => false, 'error' => "Expected $expected_fib Fill in Blank, got $actual_fib"];
+    }
+    if ($actual_sa !== $expected_sa) {
+        return ['valid' => false, 'error' => "Expected $expected_sa Short Answer, got $actual_sa"];
+    }
+    
+    return ['valid' => true, 'error' => ''];
+}
+
+/**
+ * Extract text from file using Mistral OCR API
+ * (Same function as in homework checker but adapted for assignment generator)
+ */
+function extract_text_from_file_mistral_assignment($file_path, $file_type = null) {
+    // Get API key - you can make this configurable via WordPress options
+    $api_key = 'F1dMyB2SjAGmarpPOd1z5dzV0sJfpUvT'; // Replace with your Mistral API key
+    
+    $file_name = basename($file_path);
+    error_log("🔄 Starting Mistral OCR for assignment file: $file_name");
+    
+    // Validate file exists
+    if (!file_exists($file_path)) {
+        error_log("❌ File does not exist: $file_path");
+        return 'Error: File does not exist';
+    }
+
+    // Detect file type if not provided
+    if (empty($file_type)) {
+        $file_type = mime_content_type($file_path);
+        error_log("📄 Auto-detected file type: $file_type");
+    }
+
+    // Normalize file type
+    $file_type = strtolower($file_type);
+    if ($file_type === 'image/jpg') {
+        $file_type = 'image/jpeg';
+    }
+
+    // Validate file type
+    $supported_types = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'];
+    $is_image = in_array($file_type, ['image/jpeg', 'image/jpg', 'image/png']);
+    $is_pdf = ($file_type === 'application/pdf');
+    
+    if (!$is_image && !$is_pdf) {
+        error_log("❌ Unsupported file type: $file_type");
+        return 'Error: Unsupported file type for OCR. Only JPG, JPEG, PNG and PDF files are supported.';
+    }
+
+    // Read and encode file
+    $file_data = file_get_contents($file_path);
+    if ($file_data === false) {
+        error_log("❌ Cannot read file $file_name");
+        return 'Error: Cannot read file';
+    }
+    
+    $file_size = strlen($file_data);
+    error_log("📊 File size: " . number_format($file_size) . " bytes");
+    
+    $base64_data = base64_encode($file_data);
+    
+    // Create data URL based on file type
+    if ($is_image) {
+        $data_url = 'data:' . $file_type . ';base64,' . $base64_data;
+        $doc_type = 'image_url';
+    } else {
+        $data_url = 'data:application/pdf;base64,' . $base64_data;
+        $doc_type = 'document_url';
+    }
+
+    error_log("📦 Payload prepared. Doc type: $doc_type, File type: $file_type");
+
+    // API request
+    $url = 'https://api.mistral.ai/v1/ocr';
+    $payload = json_encode([
+        'model' => 'mistral-ocr-latest',
+        'document' => [
+            'type' => $doc_type,
+            $doc_type => $data_url
+        ]
+    ]);
+
+    $headers = [
+        'Content-Type: application/json',
+        'Authorization: Bearer ' . $api_key,
+        'Accept: application/json'
+    ];
+
+    error_log("📤 Sending request to Mistral OCR API for file: $file_name");
+
+    // cURL request
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_POST => true,
+        CURLOPT_POSTFIELDS => $payload,
+        CURLOPT_HTTPHEADER => $headers,
+        CURLOPT_TIMEOUT => 90,
+        CURLOPT_CONNECTTIMEOUT => 30,
+        CURLOPT_SSL_VERIFYPEER => true,
+        CURLOPT_FAILONERROR => false,
+        CURLOPT_VERBOSE => false
+    ]);
+
+    $response = curl_exec($ch);
+    $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    
+    error_log("📥 Response received. HTTP code: $http_code, Response size: " . strlen($response) . " bytes");
+    
+    if (curl_errno($ch)) {
+        $curl_error = curl_error($ch);
+        error_log("❌ cURL error: $curl_error");
+        curl_close($ch);
+        return "OCR processing failed with connection error: $curl_error";
+    }
+    curl_close($ch);
+    
+    // Parse response
+    $result = json_decode($response, true);
+    
+    if (json_last_error() !== JSON_ERROR_NONE) {
+        error_log("❌ Invalid JSON response: " . json_last_error_msg());
+        error_log("Raw response: " . substr($response, 0, 500) . "...");
+        return "OCR returned invalid response format";
+    }
+
+    if ($http_code !== 200) {
+        $error_message = isset($result['error']['message']) ? $result['error']['message'] : 'Unknown API error';
+        error_log("❌ API error: HTTP $http_code: $error_message");
+        return "OCR processing failed with API error: $error_message";
+    }
+    
+    // Extract text from response
+    $extracted_text = '';
+    
+    if (isset($result['pages']) && is_array($result['pages'])) {
+        $page_count = count($result['pages']);
+        error_log("📄 Number of pages found: $page_count");
+        
+        foreach ($result['pages'] as $page_index => $page) {
+            if (isset($page['text']) && !empty($page['text'])) {
+                $extracted_text .= $page['text'] . "\n\n";
+                error_log("📝 Added text from page " . ($page_index + 1) . " text field");
+            } else if (isset($page['content']) && !empty($page['content'])) {
+                $extracted_text .= $page['content'] . "\n\n";
+                error_log("📝 Added text from page " . ($page_index + 1) . " content field");
+            } else if (isset($page['markdown']) && !empty($page['markdown'])) {
+                $markdown = trim($page['markdown']);
+                if (!preg_match('/^!\[.*?\]\(.*?\)$/', $markdown)) {
+                    $cleaned_text = preg_replace('/!\[.*?\]\(.*?\)/', '', $markdown);
+                    $extracted_text .= $cleaned_text . "\n\n";
+                    error_log("📝 Added cleaned markdown text from page " . ($page_index + 1));
+                }
+            } else if (isset($page['blocks']) && is_array($page['blocks']) && !empty($page['blocks'])) {
+                error_log("📦 Page " . ($page_index + 1) . " has " . count($page['blocks']) . " blocks");
+                
+                $page_text = '';
+                foreach ($page['blocks'] as $block) {
+                    if (isset($block['text']) && !empty($block['text'])) {
+                        $page_text .= $block['text'] . " ";
+                    }
+                }
+                
+                if (!empty($page_text)) {
+                    $extracted_text .= $page_text . "\n\n";
+                    error_log("📝 Added text from blocks in page " . ($page_index + 1));
+                }
+            } else if (isset($page['lines']) && is_array($page['lines'])) {
+                foreach ($page['lines'] as $line) {
+                    if (isset($line['text'])) {
+                        $extracted_text .= $line['text'] . "\n";
+                    } else if (isset($line['words']) && is_array($line['words'])) {
+                        $lineText = '';
+                        foreach ($line['words'] as $word) {
+                            if (isset($word['text'])) {
+                                $lineText .= $word['text'] . ' ';
+                            }
+                        }
+                        $extracted_text .= trim($lineText) . "\n";
+                    }
+                }
+                $extracted_text .= "\n";
+            }
+        }
+        $extracted_text = trim($extracted_text);
+    } else {
+        error_log("❌ Response has no pages array. Available keys: " . implode(", ", array_keys($result)));
+        error_log("Full response structure: " . print_r($result, true));
+    }
+    
+    if (empty($extracted_text)) {
+        error_log("⚠️ No text extracted from $file_name");
+        return "No text could be extracted from the file";
+    }
+
+    $text_length = strlen($extracted_text);
+    error_log("✅ Mistral OCR: Successfully extracted $text_length characters from $file_name (type: $file_type)");
+    
+    return $extracted_text;
+}
+
+// Function to check membership details
+function assignpg_check_membership_level() {
+    if (is_user_logged_in()) {
+        $user_id = get_current_user_id();
+        $membership_level = pmpro_getMembershipLevelForUser($user_id);
+
+        if ($membership_level) {
+            $level_id = $membership_level->id;
+            $level_name = $membership_level->name;
+
+            $level_1_name = 'EduAI Hub Free Plan';
+            $level_2_name = 'EduAI Hub Plus';
+            $level_3_name = 'EduAI Hub Enterprise';
+
+            if (empty($membership_level)) {
+                return '<div class="membership-required-message" style="
+                            text-align: center; 
+                            max-width: 500px; 
+                            margin: 100px auto; 
+                            padding: 30px; 
+                            background-color: #f8f9fa; 
+                            border-radius: 8px; 
+                            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+                        ">
+                            <h3 style="color: #333; margin-bottom: 15px; font-size: 24px;">Membership Required</h3>
+                            <p style="color: #555; margin-bottom: 20px; font-size: 16px;">You need to purchase a membership to access this feature.</p>
+                            <a href="https://vidyahub.eduaihub.in/shop/"  
+                            class="button" 
+                            style="
+                                display: inline-block;
+                                background-color: #0073aa;
+                                color: white;
+                                padding: 10px 20px;
+                                text-decoration: none;
+                                border-radius: 4px;
+                                font-weight: bold;
+                                transition: background-color 0.3s;
+                            "
+                            onmouseover="this.style.backgroundColor=\'#005177\'"
+                            onmouseout="this.style.backgroundColor=\'#0073aa\'"
+                            >View Membership Options</a>
+                        </div>';
+            }
+
+            // Change & set Membership Level IDs
+            if ($level_name == $level_1_name) {
+                $level_id = 1;
+            } elseif ($level_name == $level_2_name) {
+                $level_id = 2;
+            } elseif ($level_name == $level_3_name) {
+                $level_id = 3;
+            }
+
+            // Fetch personal API key from the webpage if membership level id is 3
+            if ($level_id == 3 && $level_name == $level_3_name) {
+                $personal_api_key = trim(get_user_meta($user_id, 'user_openai_api_key', true));
+
+                // If personal API is not set then fetch API from backend
+                if (!$personal_api_key) {
+                    $api_key = trim(get_option('openai_api_key'));
+                    if ($api_key) {
+                        return array(
+                            'level_id' => $level_id,
+                            'level_name' => $level_name,
+                            'api_key' => $api_key,
+                            'fetched_api_key_from' => 'backend_not_from_frontend',
+                        );
+                    }
+                }
+                return array(
+                    'level_id' => $level_id,
+                    'level_name' => $level_name,
+                    'api_key' => $personal_api_key,
+                    'fetched_api_key_from' => 'frontend',
+                );
+            }
+            // Fetch API key from the backend if membership level id is not 3
+            else{
+                $api_key = trim(get_option('openai_api_key'));
+                if ($api_key) {
+                    return array(
+                        'level_id' => $level_id,
+                        'level_name' => $level_name,
+                        'api_key' => $api_key,
+                        'fetched_api_key_from' => 'backend',
+                    );
+                }
+            }
+            return false;
+        } else {
+            return new WP_Error('no_membership', 'No membership level found.');
+        }
+    } else {
+        return new WP_Error('not_logged_in', 'User is not logged in.');
+    }
+}
+
+// Function to extract text from PDF
+function extract_text_from_pdf($file_path) {
+    echo "DEBUG: Attempting to extract text from PDF\n";
+    error_log("DEBUG: Attempting to extract text from PDF");
+
+    // Try using pdftotext command if available
+    if (function_exists('shell_exec') && !empty(shell_exec('which pdftotext'))) {
+        echo "DEBUG: Using pdftotext command\n";
+        error_log("DEBUG: Using pdftotext command");
+
+        $output = shell_exec("pdftotext '$file_path' -");
+        if (!empty($output)) {
+            echo "DEBUG: Successfully extracted text using pdftotext\n";
+            error_log("DEBUG: Successfully extracted text using pdftotext");
+            return $output;
+        }
+    }
+}
+
+function assignment_openai_api_call($model, $prompt) {
+    $level_1_name = 'EduAI Hub Free Plan';
+    $level_2_name = 'EduAI Hub Plus';
+    $level_3_name = 'EduAI Hub Enterprise';
+    $reset_time_in_seconds = 10800; // Set reset time here (in seconds) - 3 hours by default
+    $level_1_usage_limit = trim(get_option('assignment_plan_generator_free_plan_limit'));
+    $level_1_usage_limit = $level_1_usage_limit === '' ? null : $level_1_usage_limit;
+    $level_2_usage_limit = trim(get_option('assignment_plan_generator_plus_plan_limit'));
+    $level_2_usage_limit = $level_2_usage_limit === '' ? null : $level_2_usage_limit;
+    $level_3_usage_limit = null;
+
+    // Call the function to check the user's membership level
+    $membership_data = assignpg_check_membership_level();
+    // If there is an error in membership, return the error
+    if (is_wp_error($membership_data)) {
+        return $membership_data;
+    }
+
+    $api_key = $membership_data['api_key'];
+
+    if (!$api_key) {
+        return new WP_Error('no_api_key', 'OpenAI API key is missing.');
+    }
+
+    // Extract membership details
+    $level_id = $membership_data['level_id'];
+    $level_name = $membership_data['level_name'];
+    error_log("Membership Level: ID = $level_id, Name = $level_name");
+
+    // Define the usage limit based on membership level
+    $usage_limit = null;
+    $user_id = get_current_user_id();
+
+    if ($level_id == 1 && $level_name == $level_1_name) {
+        $usage_limit = $level_1_usage_limit;
+        error_log("ASPG assign_plan_generator_free_plan_limit: " .$level_1_usage_limit);
+    } elseif ($level_id == 2 && $level_name == $level_2_name) {
+        $usage_limit = $level_2_usage_limit;
+        error_log("ASPG assign_plan_generator_plus_plan_limit: " .$level_2_usage_limit);
+    } elseif ($level_id == 3 && $level_name == $level_3_name) {
+        $usage_limit = $level_3_usage_limit;
+        error_log("ASPG level_3_usage_limit: " .$level_3_usage_limit);
+    }
+
+    error_log("Dynamic Usage Limit Applied for ASPG: " . ($usage_limit !== null ? $usage_limit : 'No limit for this plan'));
+
+    // Check if the user has hit the usage limit, if applicable
+    if ($usage_limit !== null) {
+        $current_usage = get_user_meta($user_id, 'asspg_openai_api_usage', true);
+        $current_usage = $current_usage ? intval($current_usage) : 0;
+        error_log("Current API Usage for User ID $user_id: $current_usage");
+        
+        // Get the current time (Unix timestamp) and the last time the user hit their usage limit.
+        $current_time = time();
+        $last_usage_time = get_user_meta($user_id, 'asspg_last_usage_time', true);
+        
+        // If the user has reached the usage limit
+        if ($current_usage >= $usage_limit) {
+            // Check if this is a Plus Plan user
+            if ($level_name == $level_2_name) {
+                // If last usage time is set and 3 hours have not passed
+                if ($last_usage_time && ($current_time - intval($last_usage_time)) < $reset_time_in_seconds) { // 10800 seconds = 3 hours
+                    wp_send_json_error('You have reached your tool usage limit. Please wait for '. ($reset_time_in_seconds / 60) . ' minutes before trying again.');
+                    return;
+                } else {
+                    // Reset the usage counter if 3 hours have passed
+                    update_user_meta($user_id, 'asspg_openai_api_usage', 0);
+                    update_user_meta($user_id, 'asspg_last_usage_time', $current_time); // Update the last usage time
+                    $current_usage = 0; // Reset the usage to allow usage after the 3-hour window
+                }
+            } else {
+                // For Free Plan users, inform them about upgrading to Plus or Enterprise Plan
+                wp_send_json_error('You have reached your tool usage limit. Please upgrade to the Plus or Enterprise plan for higher usage or unlimited access.');
+                return;
+            }
+        }
+    
+        // Save the last usage time when the limit is hit
+        if ($usage_limit !== null && $current_usage >= $usage_limit) {
+            update_user_meta($user_id, 'asspg_last_usage_time', time());
+        }
+    }
+
+    error_log('assignment_openai_api_call current_usage: ' .$current_usage);
+
+    // Step 1: Check for the user's personal API key if they belong to the Enterprise membership (ID = 3)
+    $api_key = null;
+    if ($level_id == 3 && $level_name == $level_3_name) {
+        // Fetch the personal API key using get_option
+        $user_personal_api_key = get_user_meta($user_id, 'user_openai_api_key', true);
+        error_log("user's personal API key: $user_personal_api_key");
+
+        if ($user_personal_api_key) {
+            $api_key = $user_personal_api_key;
+            error_log("Using user's personal API key: $api_key");
+        } else {
+            error_log("User does not have a personal API key, falling back to the default backend API key.");
+        }
+    }
+
+    // Step 2: Fallback to the default backend API key if no personal API key is found
+    if (!$api_key) {
+        $api_key = get_option('openai_api_key');
+    }
+
+    if (!$api_key) {
+        error_log("Error: OpenAI API key is missing.");
+        return new WP_Error('no_api_key', 'OpenAI API key is missing.');
+    }
+
+    $url = 'https://api.openai.com/v1/chat/completions';
+
+    $data = array(
+        'model' => $model,
+        'messages' => array(
+            array('role' => 'user', 'content' => $prompt)
+        ),
+        'max_tokens' => 3000,
+        'temperature' => 0.2,
+    );
+
+    // Set the headers for the API request
+    $headers = array(
+        'Authorization' => 'Bearer ' . $api_key,
+        'Content-Type' => 'application/json',
+    );
+
+    // Make the API request
+    $response = wp_remote_post($url, array(
+        'headers' => $headers,
+        'body' => json_encode($data),
+        'timeout' => 120,  
+    ));
+    error_log('assignment_openai_api_call response: ' .$response);  // Log the entire response for debugging
+
+    if (is_wp_error($response)) {
+        return new WP_Error('api_error', 'Error in contacting the API: ' . $response->get_error_message());
+    }
+
+    $body = json_decode(wp_remote_retrieve_body($response), true);
+    $response_code = wp_remote_retrieve_response_code($response);
+
+    if ($response_code === 200 && isset($body['choices'][0]['message']['content'])) {
+        // Update the usage counter only after a successful response
+        if ($usage_limit !== null) {
+            $current_usage = get_user_meta($user_id, 'asspg_openai_api_usage', true);
+            $current_usage = $current_usage ? intval($current_usage) : 0;
+            update_user_meta($user_id, 'asspg_openai_api_usage', $current_usage + 1);
+            error_log("Updated API Usage for User ID $user_id: " . ($current_usage + 1));
+        }
+
+        // FIXED: Return raw content for JSON parsing instead of processing as HTML
+        $raw_content = trim($body['choices'][0]['message']['content']);
+        
+        // Try to parse as JSON first (for structured output)
+        $json_decoded = json_decode($raw_content, true);
+        if (json_last_error() === JSON_ERROR_NONE && isset($json_decoded['questions'])) {
+            // If it's valid JSON with questions, return the parsed data
+            return $json_decoded;
+        }
+        
+        // If not JSON, clean and return as before (fallback for formatted text)
+        $processed_content = preg_replace('/<p>(\s|&nbsp;)*<\/p>/', ' ', $raw_content);
+        $processed_content = preg_replace('/(<br\s*\/?>\s*)+/','<br>', $processed_content);
+        $processed_content = str_replace("\n","\n\n", $processed_content);
+        $processed_content = trim($processed_content);
+        return $processed_content;
+        
+    } else {
+        error_log("Error: Invalid API response received.");
+        return new WP_Error('invalid_response', 'Invalid API response.');
+    }
+}

@@ -1,0 +1,298 @@
+/* Assignment Generator Plugin Styles */
+
+
+/* Back to Tools Link */
+
+#back-to-tools {
+    display: inline-flex;
+    align-items: center;
+    margin-bottom: 15px;
+    text-decoration: none;
+    color: #0073aa;
+    font-weight: 500;
+}
+
+#back-to-tools svg {
+    margin-right: 8px;
+}
+
+#back-to-tools:hover {
+    color: #00567d;
+}
+
+.ct-container-full {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 80vh !important;
+    width: 100%;
+    padding-top: 0;
+    padding-bottom: 0px;
+}
+
+
+/* Main Container */
+
+#assignment-generator {
+    width: 100%;
+    max-width: 1200px;
+    margin: 40px auto;
+    padding: 30px;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    background-color: #ffffff;
+    font-family: 'Arial', sans-serif;
+}
+
+
+/* Headings */
+
+#assignment-generator h2 {
+    text-align: center;
+    color: #333;
+    margin-bottom: 25px;
+    font-size: 24px;
+}
+
+
+/* Form Labels */
+
+#assignment-generator label {
+    display: block;
+    margin-bottom: 10px;
+    font-weight: bold;
+    color: #555;
+}
+
+
+/* Form Inputs and Selects */
+
+#assignment-grade-level,
+#assignment-subject,
+#assignment-language,
+#assignment-topic {
+    width: 100%;
+    padding: 10px;
+    margin-bottom: 20px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    box-sizing: border-box;
+}
+
+#assignment-topic {
+    resize: vertical;
+    min-height: 100px;
+}
+
+
+/* Form Row and Columns */
+
+.form-row {
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+}
+
+.form-column {
+    width: 48%;
+}
+
+.form-group {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.form-group label {
+    margin-right: 10px;
+    flex-grow: 1;
+}
+
+.form-group input[type="number"] {
+    width: 80px;
+    padding: 6px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    text-align: center;
+}
+
+
+/* Generate Button */
+
+#generate-assignment {
+    width: 100%;
+    padding: 14px;
+    background-color: #0073aa;
+    color: #ffffff;
+    border: none;
+    border-radius: 4px;
+    font-size: 18px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+    margin-top: 20px;
+}
+
+#generate-assignment:hover {
+    background-color: #00567d;
+}
+
+
+/* Assignment Output */
+
+#assignment-output {
+    margin-top: 20px;
+    padding: 15px;
+    background-color: #f9f9f9;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    min-height: 100px;
+}
+
+#assignment-output pre {
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    font-family: 'Arial', sans-serif;
+    line-height: 1.6;
+}
+
+
+/* Action Buttons */
+
+#assignment-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 15px;
+}
+
+/* Copy button styles - Place this after existing button styles */
+#copy-assignment, #copy-answer-sheet {
+    background-color: #4CAF50;
+    padding: 10px;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    width: 100px;
+    justify-content: center;
+    transition: all 0.3s ease;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+#copy-assignment:hover, #copy-answer-sheet:hover {
+    background-color: #388e3c;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(76, 175, 80, 0.3);
+}
+
+#copy-assignment svg, #copy-answer-sheet svg {
+    width: 16px;
+    height: 16px;
+    margin-right: 5px;
+}
+
+/* Copy button loading state */
+#copy-assignment:disabled, #copy-answer-sheet:disabled {
+    background-color: #cccccc !important;
+    color: #666666 !important;
+    cursor: not-allowed !important;
+    opacity: 0.6 !important;
+    pointer-events: none !important;
+    transform: none !important;
+    box-shadow: none !important;
+}
+
+/* Copy button success state */
+#copy-assignment.success, #copy-answer-sheet.success {
+    background-color: #2e7d32 !important;
+    color: white !important;
+}
+
+/* Mobile responsive for copy buttons */
+@media screen and (max-width: 768px) {
+    #copy-assignment, #copy-answer-sheet {
+        width: 100% !important;
+        margin-bottom: 10px;
+        justify-content: center;
+    }
+}
+
+/* Ensure proper order in button layout */
+#assignment-actions, #answer-sheet-actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+#assignment-actions button, #answer-sheet-actions button {
+    flex-shrink: 0;
+}
+
+/* Specific ordering for buttons */
+#copy-assignment { order: 1; }
+#clear-assignment { order: 2; }
+#save-assignment { order: 3; }
+#export-to-google-form { order: 4; }
+#copy-answer-sheet { order: 1; }
+#save-answer-sheet { order: 2; }
+
+#clear-assignment {
+    background-color: #f44336;
+    color: white;
+}
+
+#clear-assignment:hover {
+    background-color: #d32f2f;
+}
+
+#copy-assignment svg,
+#clear-assignment svg {
+    margin-right: 5px;
+    width: 18px;
+    height: 18px;
+}
+
+
+/* Responsive Styles */
+
+@media screen and (max-width: 768px) {
+    .form-row,
+    .form-column {
+        flex-direction: column;
+        width: 100%;
+    }
+    .form-group {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .form-group label {
+        margin-bottom: 5px;
+    }
+    #assignment-actions {
+        flex-direction: column;
+    }
+    #copy-assignment,
+    #clear-assignment {
+        width: 100%;
+        margin-bottom: 10px;
+    }
+}
+
+@media screen and (max-width: 480px) {
+    #assignment-generator {
+        padding: 15px;
+    }
+    #assignment-generator h2 {
+        font-size: 20px;
+    }
+    #generate-assignment {
+        font-size: 16px;
+        padding: 12px;
+    }
+}

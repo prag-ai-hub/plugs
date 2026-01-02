@@ -1,0 +1,1197 @@
+<?php
+/**
+ * Plugin Name: Activity Generator
+ * Description: A plugin to generate educational activities based on grade levels and topics.
+ * Version: 1.4
+ * Author: Aiofficer
+ */
+
+// Register the shortcode
+function activity_generator_shortcode() {
+    wp_enqueue_script('activity-generator-script');
+    ob_start();
+    ?>
+    <style>
+        /* Base styling */
+        #back-to-tools {
+            display: inline-flex;
+            align-items: center;
+            margin-bottom: 15px;
+            font-size: 16px;
+            color: #0073aa;
+            text-decoration: none;
+        }
+
+        #activity-subject {
+            margin-left: 10px;
+        }
+
+        #back-to-tools:hover {
+            color: #00567d;
+        }
+
+        .ct-container-full {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 80vh;
+            width: 100%;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        #activity-generator {
+            max-width: 1200px;
+            margin: 20px auto;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);
+            font-family: Arial, sans-serif;
+            background-color: #fff;
+            box-sizing: border-box;
+            width: 1200px;
+        }
+
+        /* Two column layout for form */
+        .form-row {
+            display: flex;
+            gap: 0px;
+            margin-bottom: 20px;
+        }
+
+        .form-column {
+            flex: 1;
+        }
+
+        .form-column-full {
+            width: 100%;
+            margin-bottom: 20px;
+        }
+
+        /* Form elements */
+        #activity-grade-level,
+        #activity-subject,
+        #activity-language,
+        #activity-topic,
+        #saved-items {
+            width: 100%;
+            padding: 2px;
+            margin-bottom: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+
+        #activity-topic {
+            height: 100px;
+            resize: vertical;
+            margin-bottom: 20px;
+        }
+
+        /* Labels */
+        label {
+            font-weight: bold;
+            margin-bottom: 5px;
+            display: block;
+            color: #555;
+            font-size: 16px;
+        }
+
+        /* Generate button */
+        #generate-activity {
+            width: 100%; 
+            padding: 14px; 
+            color: #fff; 
+            border: none; 
+            border-radius: 4px; 
+            font-size: 18px; 
+            cursor: pointer; 
+            transition: background-color 0.3s ease;
+            background-color: #0073aa;
+            font-weight: 600;
+        }
+
+        #generate-activity:hover {
+            background-color: #00567d;
+        }
+
+        /* Output area - IMPROVED */
+        #activity-output {
+            display: none;
+            margin-top: 20px;
+            padding: 20px;
+            background-color: #f9f9f9 !important;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            width: 100%;
+            box-sizing: border-box;
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+        }
+
+        #activity-output p {
+            margin-bottom: 15px;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        #activity-output strong {
+            color: #0073aa;
+            font-size: 16px;
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        #activity-output ul,
+        #activity-output ol {
+            margin: 10px 0 20px 20px;
+            padding-left: 20px;
+        }
+
+        #activity-output ul li,
+        #activity-output ol li {
+            margin-bottom: 8px;
+            line-height: 1.5;
+            color: #444;
+        }
+
+        #activity-output ul {
+            list-style-type: disc;
+        }
+
+        #activity-output ol {
+            list-style-type: decimal;
+        }
+
+        /* Action buttons */
+        #activity-actions {
+            display: none;
+            margin-top: 15px;
+            justify-content: flex-end;
+            gap: 10px;
+            align-items: center;
+            width: 100%;
+        }
+
+        .action-button {
+            padding: 10px 15px;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 15px;
+            min-width: 100px;
+            transition: background-color 0.2s ease;
+        }
+
+        .action-button svg {
+            width: 18px;
+            height: 18px;
+            margin-right: 5px;
+        }
+
+        #copy-output {
+            background-color: #4CAF50;
+        }
+
+        #copy-output:hover {
+            background-color: #388e3c;
+        }
+
+        #clear-output {
+            background-color: #f44336;
+        }
+
+        #clear-output:hover {
+            background-color: #d32f2f;
+        }
+
+        #save-activity {
+            background-color: #ff9800;
+        }
+
+        #save-activity:hover {
+            background-color: rgb(225, 156, 52);
+        }
+
+        #save-activity:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+
+        /* Responsive adjustments */
+        @media screen and (max-width: 768px) {
+            #activity-generator {
+                width: 95%;
+                padding: 15px;
+                margin: 10px auto;
+            }
+            
+            #activity-subject {
+                margin-left: 0px;
+            }
+
+            .form-row {
+                flex-direction: column;
+                gap: 0;
+            }
+            
+            #generate-activity {
+                font-size: 16px;
+                padding: 12px;
+            }
+            
+            #activity-output {
+                padding: 15px;
+            }
+            
+            #activity-actions {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .action-button {
+                width: 100%;
+                margin-bottom: 5px;
+            }
+        }
+
+        @media screen and (max-width: 480px) {
+            .ct-container-full {
+                padding: 10px;
+            }
+            
+            #activity-subject {
+                margin-left: 0px;
+            }
+            
+            #activity-generator {
+                width: 100%;
+                padding: 10px;
+                margin: 5px auto;
+                border-radius: 5px;
+            }
+            
+            label, #activity-grade-level, #activity-subject, #activity-language {
+                font-size: 14px;
+            }
+            
+            #activity-topic {
+                height: 80px;
+            }
+            
+            #activity-output {
+                padding: 12px;
+                font-size: 14px;
+            }
+        }
+    </style>
+
+    <a href="https://vidyahub.eduaihub.in/tools/" id="back-to-tools" style="display: inline-flex; align-items: center;">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M19 12H5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M12 19L5 12L12 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        Back to Tools 
+    </a>
+
+    <div id="activity-generator">
+        <h2 style="text-align: center; color: #333;">Activity Generator</h2>
+        
+        <!-- Saved Items - Full Width -->
+        <div class="form-column-full">
+            <label for="saved-items">Select from Saved Activities:</label>
+            <select id="saved-items" name="saved-items">
+                <option value="">Choose from Saved Items</option>
+            </select>
+        </div>
+
+        <!-- Two Column Layout for Form Fields -->
+        <div class="form-row">
+            <div class="form-column">
+                <label for="activity-grade-level">Grade level:</label>
+                <select id="activity-grade-level" name="activity-grade-level">
+                    <option value="Select Grade">Select Grade</option>
+                    <option value="1th">1st grade</option>
+                    <option value="2nd">2nd grade</option>
+                    <option value="3rd">3rd grade</option>
+                    <option value="4th">4th grade</option>
+                    <option value="5th">5th grade</option>
+                    <option value="6th">6th grade</option>
+                    <option value="7th">7th grade</option>
+                    <option value="8th">8th grade</option>
+                    <option value="9th">9th grade</option>
+                    <option value="10th">10th grade</option>
+                    <option value="11th">11th grade</option>
+                    <option value="12th">12th grade</option>
+                </select>
+            </div>
+
+            <div class="form-column">
+                <label for="activity-subject">Subject:</label>
+                <select id="activity-subject" name="activity-subject">
+                    <option value="Select">Select</option>
+                    <option value="Mathematics">Mathematics</option>
+                    <option value="Science">Science</option>
+                    <option value="Social Studies">Social Studies</option>
+                    <option value="Marathi">Marathi</option>
+                    <option value="Hindi">Hindi</option>
+                    <option value="Art">Art</option>
+                    <option value="Physical Education">Physical Education</option>
+                    <option value="Computer Science">Computer Science</option>
+                    <option value="Other">Other</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Language Selection - Full Width with English as Default -->
+        <div class="form-column-full">
+            <label for="activity-language">Output Language:</label>
+            <select id="activity-language" name="activity-language">
+                <option value="English" selected>English</option>           
+                <option value="Hindi">Hindi</option>
+                <option value="Marathi">Marathi</option>
+            </select>
+        </div>
+
+        <!-- Topic - Full Width -->
+        <div class="form-column-full">
+            <label for="activity-topic">Topic, Standard, or Objective:</label>
+            <textarea id="activity-topic" name="activity-topic" placeholder="Enter topic, standard, or objective"></textarea>
+        </div>
+
+        <button id="generate-activity">Generate</button>
+
+        <div id="activity-output"></div>
+
+        <div id="activity-actions" style="margin-top: 10px; display: flex; justify-content: flex-end; gap: 10px; align-items: center; width: 100%;">
+            <button id="copy-output" class="action-button">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                </svg>
+                Copy
+            </button>
+            
+            <button id="clear-output" class="action-button">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="3 6 5 6 21 6"></polyline>
+                    <path d="M19 6L17.5 20a2 2 0 0 1-2-2H8.5a2 2 0 0 1-2-2L5 6m5 10v4m4-4v4"></path>
+                    <line x1="10" y1="11" x2="10" y2="17"></line>
+                </svg>
+                Clear
+            </button>
+
+            <button id="save-activity" class="action-button" style="display: none;">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                    <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                    <polyline points="7 3 7 8 15 8"></polyline>
+                </svg>
+                Save Activity
+            </button>
+        </div>
+    </div>
+
+    <script>
+        jQuery(document).ready(function($) {
+            console.log("Activity Generator initialized");
+            
+            // Get AJAX URL
+            var ajaxUrl = typeof activityGenerator !== 'undefined' && activityGenerator.ajaxurl 
+                ? activityGenerator.ajaxurl 
+                : (window.ajaxurl || '/wp-admin/admin-ajax.php');
+            
+            // Function to fetch and populate saved items
+            function fetchSavedItems() {
+                console.log("Fetching saved items...");
+                
+                $.ajax({
+                    url: ajaxUrl,
+                    method: 'POST',
+                    dataType: 'json',
+                    data: {
+                        action: 'get_saved_activities'
+                    },
+                    success: function(response) {
+                        $('#saved-items').html('<option value="">Choose from Saved Items</option>');
+
+                        if (response.success && response.data && response.data.length > 0) {
+                            response.data.forEach(function(item) {
+                                const displayTitle = `${item.title || 'Untitled'} (${item.tool_type || 'Unknown'} - ${item.subject || 'No Subject'})`;
+                                
+                                const $option = $('<option>', {
+                                    value: item.id,
+                                    'data-grade': item.grade || '',
+                                    'data-subject': item.subject || '',
+                                    'data-topic': item.topic || '',
+                                    'data-language': item.language || '',
+                                    'data-content': encodeURIComponent(item.content || '')
+                                }).text(displayTitle);
+
+                                $('#saved-items').append($option);
+                            });
+                        } else {
+                            $('#saved-items').append('<option>No saved items available</option>');
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        console.error("Error fetching saved items:", error);
+                        $('#saved-items').append('<option>Error loading saved items</option>');
+                    }
+                });
+            }
+
+            // Reset save button to original state
+            function resetSaveButton() {
+                $('#save-activity').prop('disabled', false).html(`
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                        <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                        <polyline points="7 3 7 8 15 8"></polyline>
+                    </svg>
+                    Save Activity
+                `);
+            }
+
+            // Initialize - ensure all buttons are hidden initially
+            fetchSavedItems();
+            $('#activity-output').html('').hide();
+            $('#activity-actions').hide();
+            $('#save-activity').hide();
+
+            // Event listener for saved item selection
+            $('#saved-items').on('change', function() {
+                const $selectedOption = $(this).find('option:selected');
+                const selectedVal = $selectedOption.val();
+                
+                if (selectedVal) {
+                    try {
+                        let savedContent = '';
+                        try {
+                            savedContent = decodeURIComponent($selectedOption.data('content') || '');
+                        } catch (e) {
+                            savedContent = $selectedOption.data('content') || '';
+                        }
+                        
+                        const fullTitle = $selectedOption.text();
+                        const title = fullTitle.split('(')[0].trim();
+                        
+                        const grade = $selectedOption.data('grade') || 'Select Grade';
+                        const subject = $selectedOption.data('subject') || 'Select';
+                        const topic = $selectedOption.data('topic') || title;
+                        const language = $selectedOption.data('language') || 'English';
+                        
+                        $('#activity-grade-level').val(grade);
+                        $('#activity-subject').val(subject);
+                        $('#activity-topic').val(topic);
+                        $('#activity-language').val(language);
+                        
+                        if (savedContent) {
+                            $('#activity-output').html('<p><strong>Selected Item Preview:</strong></p><div class="preview-content" style="max-height: 200px; overflow-y: auto; border: 1px solid #eee; padding: 10px; margin-bottom: 10px;">' + savedContent + '</div><p><em>Click "Generate" to create a new activity based on this content.</em></p>').show();
+                            $('#activity-actions').show();
+                        }
+                    } catch (error) {
+                        console.error("Error processing selected item:", error);
+                        $('#activity-output').html('<p style="color:red;">Error loading saved item: ' + error.message + '</p>').show();
+                    }
+                } else {
+                    // Reset form if no item selected
+                    $('#activity-grade-level').val('Select Grade');
+                    $('#activity-subject').val('Select');
+                    $('#activity-topic').val('');
+                    $('#activity-language').val('English');
+                    $('#activity-output').html('').hide();
+                    $('#activity-actions').hide();
+                    $('#save-activity').hide();
+                }
+            });
+
+            // Generate button event
+            $('#generate-activity').on('click', function() {
+                // Reset save button state first
+                resetSaveButton();
+                
+                var selectedOption = $('#saved-items option:selected');
+                var savedItemContent = '';
+                
+                if (selectedOption.val()) {
+                    try {
+                        savedItemContent = decodeURIComponent(selectedOption.data('content') || '');
+                    } catch (e) {
+                        savedItemContent = selectedOption.data('content') || '';
+                    }
+                }
+
+                var gradeLevel = $('#activity-grade-level').val();
+                var topic = $('#activity-topic').val();
+                var subject = $('#activity-subject').val();
+                var language = $('#activity-language').val();
+
+                // Validation
+                if (gradeLevel === 'Select Grade') {
+                    $('#activity-output').html('<p style="color:red;">Please select a grade level</p>').show();
+                    return;
+                }
+                
+                if (subject === 'Select') {
+                    $('#activity-output').html('<p style="color:red;">Please select a subject</p>').show();
+                    return;
+                }
+                
+                if (!topic.trim()) {
+                    $('#activity-output').html('<p style="color:red;">Please enter a topic</p>').show();
+                    return;
+                }
+
+                $('#activity-output').html('<p>Generating activity...</p>').show();
+                $('#activity-actions').hide();
+                $('#save-activity').hide();
+
+                $.ajax({
+                    url: ajaxUrl,
+                    method: 'POST',
+                    data: {
+                        action: 'generate_activity',
+                        grade: gradeLevel,
+                        topic: topic,
+                        subject: subject,
+                        language: language,
+                        saved_item_content: savedItemContent
+                    },
+                    success: function(response) {
+                        if (typeof response === 'string') {
+                            try {
+                                response = JSON.parse(response);
+                            } catch (e) {
+                                // Response is already HTML, display it
+                                $('#activity-output').html(response);
+                                $('#activity-actions').show();
+                                $('#save-activity').show();
+                                resetSaveButton();
+                                return;
+                            }
+                        }
+                        
+                        if (response.success) {
+                            // Display the HTML content directly
+                            $('#activity-output').html(response.data);
+                            $('#activity-actions').show();
+                            $('#save-activity').show();
+                            resetSaveButton();
+                        } else {
+                            if (response.data && response.data.includes('You have reached your tool usage limit')) {
+                                $('#activity-output').html('<p style="color:red;">' + response.data + '</p>');
+                            } else {
+                                $('#activity-output').html('<p style="color:red;">Error generating the result. Please try again.</p>');
+                            }
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        $('#activity-output').html('<p style="color:red;">Error generating the result. Please try again.</p>');
+                        console.error("Generate Activity Error:", xhr.responseText);
+                    }
+                });
+            });
+
+            // Copy button event - Improved to handle HTML formatting
+            $('#copy-output').on('click', function() {
+                var $outputDiv = $('#activity-output');
+                
+                if ($outputDiv.length === 0 || !$outputDiv.html().trim()) {
+                    alert('No content to copy');
+                    return;
+                }
+                
+                // Clone the output and create a clean text version
+                var $clone = $outputDiv.clone();
+                
+                // Convert HTML to readable plain text
+                var plainText = '';
+                $clone.find('p, li').each(function() {
+                    var $elem = $(this);
+                    var text = $elem.text().trim();
+                    
+                    if ($elem.is('li')) {
+                        if ($elem.parent().is('ol')) {
+                            plainText += '  • ' + text + '\n';
+                        } else {
+                            plainText += '  • ' + text + '\n';
+                        }
+                    } else if (text) {
+                        plainText += text + '\n\n';
+                    }
+                });
+                
+                plainText = plainText.trim();
+                
+                if (!plainText) {
+                    alert('No content to copy');
+                    return;
+                }
+                
+                // Try modern clipboard API first
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(plainText).then(function() {
+                        alert('Content copied to clipboard!');
+                    }).catch(function(err) {
+                        console.error('Clipboard API failed:', err);
+                        fallbackCopy(plainText);
+                    });
+                } else {
+                    fallbackCopy(plainText);
+                }
+                
+                function fallbackCopy(text) {
+                    var tempTextarea = document.createElement('textarea');
+                    tempTextarea.value = text;
+                    tempTextarea.style.position = 'fixed';
+                    tempTextarea.style.opacity = '0';
+                    document.body.appendChild(tempTextarea);
+                    tempTextarea.focus();
+                    tempTextarea.select();
+                    
+                    try {
+                        var successful = document.execCommand('copy');
+                        if (successful) {
+                            alert('Content copied to clipboard!');
+                        } else {
+                            alert('Copy failed. Please select and copy manually.');
+                        }
+                    } catch (err) {
+                        console.error('Fallback copy failed:', err);
+                        alert('Copy failed. Please select and copy manually.');
+                    } finally {
+                        document.body.removeChild(tempTextarea);
+                    }
+                }
+            });
+
+            // Clear button event
+            $('#clear-output').on('click', function() {
+                $('#activity-output').html('').hide();
+                $('#activity-grade-level').val('Select Grade');
+                $('#activity-subject').val('Select');
+                $('#activity-topic').val('');
+                $('#activity-language').val('English');
+                $('#saved-items').val('');
+                $('#activity-actions').hide();
+                $('#save-activity').hide();
+                resetSaveButton();
+            });
+
+            // Save button event
+            $('#save-activity').on('click', function() {
+                var $saveButton = $(this);
+                
+                // Prevent multiple clicks
+                if ($saveButton.prop('disabled')) {
+                    return;
+                }
+                
+                var activityTitle = $('#activity-topic').val();
+                var activityContent = $('#activity-output').html();
+                var gradeLevel = $('#activity-grade-level').val();
+                var subject = $('#activity-subject').val();
+                var language = $('#activity-language').val();
+                var topic = $('#activity-topic').val();
+
+                if (!activityTitle || !activityContent.trim()) {
+                    alert('No activity to save.');
+                    return;
+                }
+
+                // Set loading state
+                var originalHtml = $saveButton.html();
+                $saveButton.prop('disabled', true).html('Saving...');
+
+                $.ajax({
+                    url: ajaxUrl,
+                    method: 'POST',
+                    data: {
+                        action: 'save_activity',
+                        activity_title: activityTitle,
+                        activity_content: activityContent,
+                        grade_level: gradeLevel,
+                        subject: subject,
+                        language: language,
+                        topic: topic
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            alert('Activity saved successfully!');
+                            $saveButton.hide();
+                            fetchSavedItems();
+                        } else {
+                            alert('Error saving activity: ' + response.data);
+                            $saveButton.prop('disabled', false).html(originalHtml);
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        alert('Error: ' + error);
+                        $saveButton.prop('disabled', false).html(originalHtml);
+                    },
+                    complete: function() {
+                        // Ensure button is re-enabled if still visible
+                        if ($saveButton.is(':visible') && $saveButton.prop('disabled')) {
+                            $saveButton.prop('disabled', false).html(originalHtml);
+                        }
+                    }
+                });
+            });
+        });
+    </script>
+    <?php
+    return ob_get_clean();
+}
+add_shortcode('activity_generator', 'activity_generator_shortcode');
+
+// Enqueue scripts and styles
+function activity_generator_scripts() {
+    wp_enqueue_style('font-awesome', 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css');
+    wp_enqueue_script('jquery');
+    
+    wp_register_script('activity-generator-js', false);
+    wp_localize_script('activity-generator-js', 'activityGenerator', array(
+        'ajaxurl' => admin_url('admin-ajax.php')
+    ));
+    wp_enqueue_script('activity-generator-js');
+}
+add_action('wp_enqueue_scripts', 'activity_generator_scripts');
+
+// AJAX handlers
+add_action('wp_ajax_generate_activity', 'handle_generate_activity');
+add_action('wp_ajax_nopriv_generate_activity', 'handle_generate_activity');
+add_action('wp_ajax_save_activity', 'save_activity_to_library');
+add_action('wp_ajax_nopriv_save_activity', 'save_activity_to_library');
+add_action('wp_ajax_get_saved_activities', 'act_get_saved_activities_callback');
+add_action('wp_ajax_nopriv_get_saved_activities', 'act_get_saved_activities_callback');
+
+// Get saved activities callback
+function act_get_saved_activities_callback() {
+    if (!wp_doing_ajax()) {
+        wp_send_json_error('Invalid request type');
+        exit;
+    }
+
+    if (!is_user_logged_in()) {
+        wp_send_json_success([
+            [
+                'id' => '0',
+                'title' => 'Test Activity (Demo)',
+                'content' => '<p>This is test content</p>',
+                'tool_type' => 'activity',
+                'created_at' => date('Y-m-d H:i:s'),
+                'grade' => '5th',
+                'subject' => 'Science',
+                'topic' => 'Solar System',
+                'language' => 'English'
+            ]
+        ]);
+        exit;
+    }
+
+    $user_id = get_current_user_id();
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'eduai_tool_data';
+    
+    if ($wpdb->get_var("SHOW TABLES LIKE '$table_name'") != $table_name) {
+        wp_send_json_error('Database table not found');
+        exit;
+    }
+
+    try {
+        $query = $wpdb->prepare(
+            "SELECT id, title, content, metadata, tool_type, created_at
+            FROM $table_name 
+            WHERE user_id = %d
+            ORDER BY created_at DESC", 
+            $user_id
+        );
+
+        $items = $wpdb->get_results($query, ARRAY_A);
+
+        if (empty($items)) {
+            wp_send_json_success([]);
+            exit;
+        }
+
+        $cleaned_items = [];
+        foreach ($items as $item) {
+            try {
+                $metadata = json_decode($item['metadata'], true);
+                if (json_last_error() !== JSON_ERROR_NONE) {
+                    $metadata = [];
+                }
+                
+                $cleaned_item = [
+                    'id' => $item['id'],
+                    'title' => !empty($item['title']) ? sanitize_text_field($item['title']) : 'Untitled',
+                    'content' => !empty($item['content']) ? wp_kses_post($item['content']) : '',
+                    'tool_type' => !empty($item['tool_type']) ? sanitize_text_field($item['tool_type']) : 'activity',
+                    'created_at' => $item['created_at'],
+                    'grade' => isset($metadata['grade_level']) ? sanitize_text_field($metadata['grade_level']) : '',
+                    'subject' => isset($metadata['subject']) ? sanitize_text_field($metadata['subject']) : '',
+                    'topic' => isset($metadata['topic']) ? sanitize_text_field($metadata['topic']) : '',
+                    'language' => isset($metadata['language']) ? sanitize_text_field($metadata['language']) : 'English'
+                ];
+
+                $cleaned_items[] = $cleaned_item;
+            } catch (Exception $e) {
+                error_log('Error processing item: ' . $e->getMessage());
+                continue;
+            }
+        }
+
+        wp_send_json_success($cleaned_items);
+        exit;
+
+    } catch (Exception $e) {
+        error_log('Exception occurred - ' . $e->getMessage());
+        wp_send_json_error('An error occurred while fetching saved items');
+        exit;
+    }
+}
+
+// Save activity to library
+function save_activity_to_library() {
+    global $wpdb;
+
+    if (!is_user_logged_in()) {
+        wp_send_json_error('You must be logged in to save an activity.');
+        return;
+    }
+
+    $user_id = get_current_user_id();
+    $activity_title = sanitize_text_field($_POST['activity_title']);
+    $activity_content = wp_kses_post($_POST['activity_content']);
+    
+    $grade_level = isset($_POST['grade_level']) ? sanitize_text_field($_POST['grade_level']) : '';
+    $subject = isset($_POST['subject']) ? sanitize_text_field($_POST['subject']) : '';
+    $language = isset($_POST['language']) ? sanitize_text_field($_POST['language']) : 'English';
+    $topic = isset($_POST['topic']) ? sanitize_text_field($_POST['topic']) : '';
+    
+    $metadata = json_encode(array(
+        'grade_level' => $grade_level,
+        'subject' => $subject,
+        'language' => $language,
+        'topic' => $topic
+    ));
+
+    $table_name = $wpdb->prefix . 'eduai_tool_data';
+    
+    if ($wpdb->get_var("SHOW TABLES LIKE '$table_name'") != $table_name) {
+        create_eduai_universal_tool_data_table();
+    }
+
+    $inserted = $wpdb->insert(
+        $table_name,
+        array(
+            'user_id' => $user_id,
+            'tool_type' => 'activity',
+            'title' => $activity_title,
+            'content' => $activity_content,
+            'metadata' => $metadata,
+            'created_at' => current_time('mysql')
+        ),
+        array('%d', '%s', '%s', '%s', '%s', '%s')
+    );
+
+    if ($inserted) {
+        wp_send_json_success(array(
+            'message' => 'Activity saved successfully.',
+            'redirect' => site_url('/eduaihub/user-account/my-library')
+        ));
+    } else {
+        wp_send_json_error('Database error: ' . $wpdb->last_error);
+    }
+}
+
+// Handle generate activity AJAX request - IMPROVED VERSION
+function handle_generate_activity() {
+    $grade = sanitize_text_field($_POST['grade']);
+    $topic = sanitize_text_field($_POST['topic']);
+    $subject = sanitize_text_field($_POST['subject']); 
+    $language = sanitize_text_field($_POST['language']);
+    $saved_item_content = isset($_POST['saved_item_content']) ? $_POST['saved_item_content'] : '';
+
+    $model = 'gpt-4o';
+    
+    $prompt = "
+Create a detailed educational activity plan for grade [$grade] on the topic '[$topic]' for the subject '[$subject]'. 
+
+CRITICAL FORMATTING REQUIREMENTS:
+- Output ONLY clean HTML without any markdown indicators (no ```html or ``` tags)
+- Use proper HTML structure with paragraphs and lists
+- Each section should be properly formatted
+- Use <strong> tags for labels/headings
+- Use <ul> for unordered lists and <ol> for ordered lists
+- Keep content well-organized and readable
+
+The activity should include these sections in this exact format:
+
+<p><strong>Grade Level or Age Group:</strong> [$grade]</p>
+
+<p><strong>Subject:</strong> [$subject]</p>
+
+<p><strong>Topic or Concept:</strong> [$topic]</p>
+
+<p><strong>Learning Objective:</strong><br>
+[Write a clear, concise learning objective]</p>
+
+<p><strong>Type of Activity:</strong><br>
+[Specify the activity type]</p>
+
+<p><strong>Materials Needed:</strong></p>
+<ul>
+<li>[Material 1]</li>
+<li>[Material 2]</li>
+<li>[Material 3]</li>
+</ul>
+
+<p><strong>Instructions:</strong></p>
+<ol>
+<li>[Detailed step 1]</li>
+<li>[Detailed step 2]</li>
+<li>[Detailed step 3]</li>
+</ol>
+
+<p><strong>Assessment:</strong><br>
+[Describe how to assess student learning]</p>
+
+<p><strong>Extension Activity:</strong><br>
+[Provide an additional challenge or extension]</p>
+";
+    
+    if (!empty($saved_item_content)) {
+        $prompt .= "
+
+Use the following previously saved content as a reference to create your activity. Either use it as inspiration or build upon it to create a new activity:
+
+$saved_item_content
+";
+    }
+    
+    $prompt .= "
+
+IMPORTANT: 
+1. Please provide the entire response in [$language] language.
+2. Output ONLY the HTML content, no markdown code blocks or backticks.
+3. Ensure all HTML tags are properly closed.
+4. Keep the formatting clean and professional.
+5. DO NOT include ```html or ``` in your response.
+";
+
+    $response = activity_openai_api_call($model, $prompt);
+
+    if (is_wp_error($response)) {
+        wp_send_json_error($response->get_error_message());
+    } else {
+        wp_send_json_success($response);
+    }
+}
+
+// Check membership level
+function apg_check_membership_level() {
+    if (is_user_logged_in()) {
+        $user_id = get_current_user_id();
+        $membership_level = pmpro_getMembershipLevelForUser($user_id);
+
+        if ($membership_level) {
+            $level_id = $membership_level->id;
+            $level_name = $membership_level->name;
+
+            $level_1_name = 'EduAI Hub Free Plan';
+            $level_2_name = 'EduAI Hub Plus';
+            $level_3_name = 'EduAI Hub Enterprise';
+
+            if (empty($membership_level)) {
+                return '<div class="membership-required-message" style="text-align: center; max-width: 500px; margin: 100px auto; padding: 30px; background-color: #f8f9fa; border-radius: 8px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+                            <h3 style="color: #333; margin-bottom: 15px; font-size: 24px;">Membership Required</h3>
+                            <p style="color: #555; margin-bottom: 20px; font-size: 16px;">You need to purchase a membership to access this feature.</p>
+                            <a href="https://vidyahub.eduaihub.in/shop/" class="button" style="display: inline-block; background-color: #0073aa; color: white; padding: 10px 20px; text-decoration: none; border-radius: 4px; font-weight: bold; transition: background-color 0.3s;" onmouseover="this.style.backgroundColor=\'#005177\'" onmouseout="this.style.backgroundColor=\'#0073aa\'">View Membership Options</a>
+                        </div>';
+            }
+
+            if ($level_name == $level_1_name) {
+                $level_id = 1;
+            } elseif ($level_name == $level_2_name) {
+                $level_id = 2;
+            } elseif ($level_name == $level_3_name) {
+                $level_id = 3;
+            }
+
+            if ($level_id == 3 && $level_name == $level_3_name) {
+                $personal_api_key = trim(get_user_meta($user_id, 'user_openai_api_key', true));
+
+                if (!$personal_api_key) {
+                    $api_key = trim(get_option('openai_api_key'));
+                    if ($api_key) {
+                        return array(
+                            'level_id' => $level_id,
+                            'level_name' => $level_name,
+                            'api_key' => $api_key,
+                            'fetched_api_key_from' => 'backend_not_from_frontend',
+                        );
+                    }
+                }
+                return array(
+                    'level_id' => $level_id,
+                    'level_name' => $level_name,
+                    'api_key' => $personal_api_key,
+                    'fetched_api_key_from' => 'frontend',
+                );
+            } else {
+                $api_key = trim(get_option('openai_api_key'));
+                if ($api_key) {
+                    return array(
+                        'level_id' => $level_id,
+                        'level_name' => $level_name,
+                        'api_key' => $api_key,
+                        'fetched_api_key_from' => 'backend',
+                    );
+                }
+            }
+            return false;
+        } else {
+            return new WP_Error('no_membership', 'No membership level found.');
+        }
+    } else {
+        return new WP_Error('not_logged_in', 'User is not logged in.');
+    }
+}
+
+// OpenAI API call function - IMPROVED VERSION
+function activity_openai_api_call($model, $prompt) {
+    $level_1_name = 'EduAI Hub Free Plan';
+    $level_2_name = 'EduAI Hub Plus';
+    $level_3_name = 'EduAI Hub Enterprise';
+    $reset_time_in_seconds = 10800;
+    $level_1_usage_limit = trim(get_option('activity_plan_generator_free_plan_limit'));
+    $level_1_usage_limit = $level_1_usage_limit === '' ? null : $level_1_usage_limit;
+    $level_2_usage_limit = trim(get_option('activity_plan_generator_plus_plan_limit'));
+    $level_2_usage_limit = $level_2_usage_limit === '' ? null : $level_2_usage_limit;
+    $level_3_usage_limit = null;
+
+    $membership_data = apg_check_membership_level();
+    if (is_wp_error($membership_data)) {
+        return $membership_data;
+    }
+
+    $api_key = $membership_data['api_key'];
+
+    if (!$api_key) {
+        return new WP_Error('no_api_key', 'OpenAI API key is missing.');
+    }
+
+    $level_id = $membership_data['level_id'];
+    $level_name = $membership_data['level_name'];
+    $usage_limit = null;
+    $user_id = get_current_user_id();
+
+    if ($level_id == 1 && $level_name == $level_1_name) {
+        $usage_limit = $level_1_usage_limit;
+    } elseif ($level_id == 2 && $level_name == $level_2_name) {
+        $usage_limit = $level_2_usage_limit;
+    } elseif ($level_id == 3 && $level_name == $level_3_name) {
+        $usage_limit = $level_3_usage_limit;
+    }
+
+    if ($usage_limit !== null) {
+        $current_usage = get_user_meta($user_id, 'APG_openai_api_usage', true);
+        $current_usage = $current_usage ? intval($current_usage) : 0;
+        $current_time = time();
+        $last_usage_time = get_user_meta($user_id, 'APG_last_usage_time', true);
+
+        if ($current_usage >= $usage_limit) {
+            if ($level_name == $level_2_name) {
+                if ($last_usage_time && ($current_time - intval($last_usage_time)) < $reset_time_in_seconds) {
+                    wp_send_json_error('You have reached your tool usage limit. Please wait for 3 Hours before trying again.');
+                    return;
+                } else {
+                    update_user_meta($user_id, 'APG_openai_api_usage', 0);
+                    update_user_meta($user_id, 'APG_last_usage_time', $current_time);
+                    $current_usage = 0;
+                }
+            } else {
+                wp_send_json_error('You have reached your tool usage limit. Please upgrade to the Plus or Enterprise plan for higher usage or unlimited access.');
+                return;
+            }
+        }
+        
+        if ($usage_limit !== null && $current_usage >= $usage_limit) {
+            update_user_meta($user_id, 'APG_last_usage_time', time());
+        }
+    }
+
+    if ($level_id == 3 && $level_name == $level_3_name) {
+        $user_personal_api_key = get_user_meta($user_id, 'user_openai_api_key', true);
+
+        if ($user_personal_api_key) {
+            $api_key = $user_personal_api_key;
+        }
+    }
+
+    if (!$api_key) {
+        $api_key = get_option('openai_api_key');
+    }
+
+    if (!$api_key) {
+        return new WP_Error('no_api_key', 'OpenAI API key is missing.');
+    }
+
+    $url = 'https://api.openai.com/v1/chat/completions';
+
+    $data = array(
+        'model' => $model,
+        'messages' => array(
+            array('role' => 'user', 'content' => $prompt)
+        ),
+        'max_tokens' => 2500,
+        'temperature' => 0.2,
+    );
+
+    $headers = array(
+        'Authorization' => 'Bearer ' . $api_key,
+        'Content-Type' => 'application/json',
+    );
+
+    $response = wp_remote_post($url, array(
+        'headers' => $headers,
+        'body' => json_encode($data),
+        'timeout' => 80,
+    ));
+
+    if (is_wp_error($response)) {
+        return new WP_Error('api_error', 'Error in contacting the API: ' . $response->get_error_message());
+    }
+
+    $body = json_decode(wp_remote_retrieve_body($response), true);
+    $response_code = wp_remote_retrieve_response_code($response);
+
+    if ($response_code === 200 && isset($body['choices'][0]['message']['content'])) {
+        if ($usage_limit !== null) {
+            $current_usage = get_user_meta($user_id, 'APG_openai_api_usage', true);
+            $current_usage = $current_usage ? intval($current_usage) : 0;
+            update_user_meta($user_id, 'APG_openai_api_usage', $current_usage + 1);
+        }
+        
+        $content = trim($body['choices'][0]['message']['content']);
+        
+        // Remove markdown code blocks if present
+        $content = preg_replace('/^```html\s*/i', '', $content);
+        $content = preg_replace('/\s*```$/i', '', $content);
+        $content = trim($content);
+        
+        // Return clean HTML
+        return $content;
+    } else {
+        return new WP_Error('invalid_response', 'Invalid API response.');
+    }
+}  
+?>
